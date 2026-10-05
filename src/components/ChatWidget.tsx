@@ -11,6 +11,7 @@ export function ChatPanel({
   businessName,
   ownerName,
   preview = false,
+  source,
   onClose,
   className = "",
 }: {
@@ -18,6 +19,8 @@ export function ChatPanel({
   businessName: string;
   ownerName: string;
   preview?: boolean;
+  /** How the visitor arrived (tap, qr or link), for analytics. */
+  source?: string;
   onClose?: () => void;
   className?: string;
 }) {
@@ -43,7 +46,7 @@ export function ChatPanel({
       const res = await fetch(`/api/chat/${slug}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: next, preview }),
+        body: JSON.stringify({ messages: next, preview, source }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong.");

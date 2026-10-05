@@ -6,13 +6,27 @@ import { ChatPanel } from "@/components/ChatWidget";
 import type { Agent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { saveAgent, type AgentInput } from "../actions";
+import { saveCompanyAgent } from "../company/actions";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LEARN_STEPS = ["Visiting your website", "Reading your pages", "Understanding your services", "Writing your AI's knowledge base"];
 
 type Form = Required<Omit<AgentInput, "slot_minutes">> & { slot_minutes: 15 | 30 | 45 | 60 | 90 };
 
-export function AgentEditor({ initial, slug, businessName, ownerName }: { initial: Agent | null; slug: string; businessName: string; ownerName: string }) {
+export function AgentEditor({
+  initial,
+  slug,
+  businessName,
+  ownerName,
+  company = false,
+}: {
+  initial: Agent | null;
+  slug: string;
+  businessName: string;
+  ownerName: string;
+  /** Edit the company-wide agent shared by every employee card. */
+  company?: boolean;
+}) {
   const [form, setForm] = useState<Form>(() => ({
     business_name: initial?.business_name || businessName,
     description: initial?.description ?? "",
@@ -59,7 +73,7 @@ export function AgentEditor({ initial, slug, businessName, ownerName }: { initia
     setLearnStep(0);
     setStatus({});
     try {
-      const res = await fetch("/api/ai/learn", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: form.website_url }) });
+      const res = await fetch("/api/ai/learn", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: form.website_url, company }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       set("knowledge", json.knowledge);
@@ -74,7 +88,7 @@ export function AgentEditor({ initial, slug, businessName, ownerName }: { initia
   function submit(e: React.FormEvent) {
     e.preventDefault();
     start(async () => {
-      const res = await saveAgent(form);
+      const res = await (company ? saveCompanyAgent : saveAgent)(form);
       if (!res.ok) return setStatus({ error: res.error });
       setSaved(true);
       setStatus({ ok: "Your AI agent is saved and up to date." });
@@ -199,10 +213,10 @@ export function AgentEditor({ initial, slug, businessName, ownerName }: { initia
 
       <aside className="xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-sm font-semibold text-muted">Test your AI</p>
-        {saved ? (
+        {saved && slug ? (
           <ChatPanel slug={slug} businessName={form.business_name || businessName} ownerName={ownerName} preview className="h-[600px] rounded-[24px] border border-line shadow-lg" />
         ) : (
-          <div className="card-surface grid h-[300px] place-items-center p-8 text-center text-sm text-muted">Save your AI agent to start chatting with it.</div>
+          <div className="card-surface grid h-[300px] place-items-center p-8 text-center text-sm text-muted">{saved ? "Add an employee card to test your company AI." : "Save your AI agent to start chatting with it."}</div>
         )}
       </aside>
     </div>

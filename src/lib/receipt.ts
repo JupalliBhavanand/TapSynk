@@ -1,5 +1,5 @@
 import type { ReceiptData } from "@/components/Receipt";
-import { INTERVALS, PLANS } from "@/lib/plans";
+import { INTERVALS, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import type { Order } from "@/lib/types";
 
 export function orderToReceipt(order: Order, fallbackName: string): ReceiptData {
@@ -10,11 +10,20 @@ export function orderToReceipt(order: Order, fallbackName: string): ReceiptData 
     cardBrand: order.card_brand,
     cardLast4: order.card_last4,
     date: order.created_at,
-    items: [
-      { label: `1X ${PLANS[order.tier].name} (${INTERVALS[order.billing_interval].label})`, amount: order.amount_subtotal },
-      { label: "1X Premium NFC Card (printed)", amount: null },
-      { label: `1X AI-ready card page${order.tier === "ai" ? " + AI agent" : ""}`, amount: null },
-    ],
+    items: order.company_id
+      ? [
+          { label: `${order.quantity}X Company ${PLANS[order.tier].name} (Monthly)`, amount: order.amount_subtotal },
+          { label: `${order.quantity}X Premium NFC Card (printed)`, amount: null },
+          { label: "1X Team analytics dashboard", amount: null },
+        ]
+      : [
+          {
+            label: `1X ${PLANS[order.tier].name} (${INTERVALS[order.billing_interval].label})${order.amount_subtotal === 0 ? ` · FIRST ${TRIAL_DAYS} DAYS FREE` : ""}`,
+            amount: order.amount_subtotal,
+          },
+          { label: "1X Premium NFC Card (printed)", amount: null },
+          { label: `1X AI-ready card page${order.tier === "ai" ? " + AI agent" : ""}`, amount: null },
+        ],
     subtotal: order.amount_subtotal,
     discount: order.amount_discount,
     tax: order.amount_tax,

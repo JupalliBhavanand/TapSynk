@@ -11,10 +11,10 @@ import { isActive, type Appointment } from "@/lib/types";
 
 export default async function DashboardHome() {
   const data = (await getDashboardData())!;
-  const { card, subscription, agent, supabase } = data;
+  const { card, subscription, agent, supabase, trialAvailable } = data;
   const active = isActive(subscription);
   const link = card ? `${SITE_URL}/c/${card.slug}` : "";
-  const qr = card ? await QRCode.toDataURL(link, { margin: 1, width: 360, color: { dark: "#0f1426", light: "#ffffff" } }) : null;
+  const qr = card ? await QRCode.toDataURL(`${link}?s=q`, { margin: 1, width: 360, color: { dark: "#0f1426", light: "#ffffff" } }) : null;
 
   const { data: upcoming } = card
     ? await supabase
@@ -31,7 +31,7 @@ export default async function DashboardHome() {
     { done: Boolean(card), label: "Create your digital card", href: "/dashboard/card" },
     { done: Boolean(card?.published), label: "Publish & print your card", href: "/dashboard/card" },
     { done: Boolean(agent && (agent.knowledge || agent.description)), label: "Train your AI agent", href: "/dashboard/ai" },
-    { done: active, label: "Choose a plan & ship your NFC card", href: "/dashboard/billing" },
+    { done: active, label: trialAvailable ? "Start your free month & get your NFC card" : "Choose a plan & ship your NFC card", href: "/dashboard/billing" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -118,7 +118,9 @@ export default async function DashboardHome() {
                   {PLANS[subscription.tier].name} <span className="text-sm font-medium text-muted">· {INTERVALS[subscription.billing_interval].label}</span>
                 </p>
                 {subscription.current_period_end && (
-                  <p className="text-sm text-muted">Renews {new Date(subscription.current_period_end).toLocaleDateString()}</p>
+                  <p className="text-sm text-muted">
+                    {subscription.status === "trialing" ? "Free month · first charge on" : "Renews"} {new Date(subscription.current_period_end).toLocaleDateString()}
+                  </p>
                 )}
                 {subscription.tier === "virtual" && (
                   <Link href="/dashboard/billing" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
@@ -128,8 +130,12 @@ export default async function DashboardHome() {
               </div>
             ) : (
               <div className="mt-3">
-                <p className="text-sm text-muted">Choose a plan to make your card live and get your NFC card shipped.</p>
-                <Link href="/dashboard/billing" className="btn btn-primary mt-4">See plans</Link>
+                <p className="text-sm text-muted">
+                  {trialAvailable
+                    ? "Your first month is free. Pay $0 today, make your card live and get your NFC card shipped."
+                    : "Choose a plan to make your card live and get your NFC card shipped."}
+                </p>
+                <Link href="/dashboard/billing" className="btn btn-primary mt-4">{trialAvailable ? "Start free month" : "See plans"}</Link>
               </div>
             )}
           </section>

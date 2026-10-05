@@ -5,6 +5,7 @@ import { chatHistorySchema, runAgent } from "@/lib/agent";
 import { getPublicCard } from "@/lib/data";
 import { REQUIRE_SUBSCRIPTION } from "@/lib/env";
 import { rateLimit } from "@/lib/rate-limit";
+import { parseSource } from "@/lib/source";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
 import { isActive } from "@/lib/types";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[slug]">) {
   const { slug } = await ctx.params;
-  const body = z.object({ messages: chatHistorySchema, preview: z.boolean().optional() }).safeParse(await request.json().catch(() => null));
+  const body = z.object({ messages: chatHistorySchema, preview: z.boolean().optional(), source: z.string().max(8).optional() }).safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Invalid message." }, { status: 400 });
 
   const found = await getPublicCard(slug);
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
 
   if (!isOwner && body.data.messages.length === 1) {
     after(async () => {
-      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "ai" });
+      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "ai", p_source: parseSource(body.data.source) });
     });
   }
 

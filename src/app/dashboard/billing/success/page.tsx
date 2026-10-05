@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Bot, IdCard } from "lucide-react";
+import { ArrowRight, BarChart3, Bot, IdCard, Users } from "lucide-react";
 import { ReceiptPrinter } from "@/components/ReceiptPrinter";
 import { fulfillCheckout } from "@/lib/billing";
 import { getDashboardData } from "@/lib/data";
@@ -32,6 +32,20 @@ export default async function SuccessPage({ searchParams }: PageProps<"/dashboar
           <p className="mt-2 text-muted">We're finalising your order. Refresh in a moment to see your receipt.</p>
         </div>
       )}
+      {order?.company_id ? (
+        <div className="fade-up mt-12 grid gap-4 sm:grid-cols-2" style={{ animationDelay: "3.4s" }}>
+          <Link href="/dashboard/company" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
+            <Users className="h-6 w-6 text-brand" />
+            <span className="flex-1"><span className="block font-semibold">Add your team</span><span className="text-sm text-muted">Create a card for each employee</span></span>
+            <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
+          </Link>
+          <Link href="/dashboard/company/analytics" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
+            <BarChart3 className="h-6 w-6 text-brand" />
+            <span className="flex-1"><span className="block font-semibold">Team analytics</span><span className="text-sm text-muted">See how every card performs</span></span>
+            <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
+          </Link>
+        </div>
+      ) : (
       <div className="fade-up mt-12 grid gap-4 sm:grid-cols-2" style={{ animationDelay: "3.4s" }}>
         <Link href={card ? "/dashboard/card" : "/dashboard/card"} className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
           <IdCard className="h-6 w-6 text-brand" />
@@ -44,6 +58,7 @@ export default async function SuccessPage({ searchParams }: PageProps<"/dashboar
           <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
         </Link>
       </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { priceData } from "@/lib/billing";
 import { SITE_URL } from "@/lib/env";
-import { PLANS, SHIPPING_COUNTRIES } from "@/lib/plans";
+import { INTERVALS, PLANS, SHIPPING_COUNTRIES, TRIAL_DAYS } from "@/lib/plans";
 import { rateLimit } from "@/lib/rate-limit";
 import { stripe } from "@/lib/stripe";
 import { getUser } from "@/lib/supabase/server";
@@ -37,18 +37,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ url: `/dashboard/billing?changed=${tier}` });
     }
 
+    // First month free, once per account (never after a previous subscription).
+    const { data: profile } = await supabase.from("profiles").select("trial_used_at").eq("id", user.id).maybeSingle();
+    const trial = !current && !profile?.trial_used_at;
+    const price = `$${PLANS[tier].prices[interval]}${INTERVALS[interval].short}`;
+
     const session = await stripe().checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price_data: await priceData(tier, interval), quantity: 1 }],
       ...(current?.stripe_customer_id ? { customer: current.stripe_customer_id } : { customer_email: user.email }),
       client_reference_id: user.id,
       metadata,
-      subscription_data: { metadata, description: `TapSync ${PLANS[tier].name}` },
+      subscription_data: {
+        metadata,
+        description: `TapSync ${PLANS[tier].name}`,
+        ...(trial ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } } } : {}),
+      },
+      payment_method_collection: "always",
       shipping_address_collection: { allowed_countries: [...SHIPPING_COUNTRIES] },
       phone_number_collection: { enabled: true },
       custom_text: {
         shipping_address: { message: "We'll print your NFC card and ship it here for free." },
-        submit: { message: "Your plan starts today and your card ships within 3–5 business days." },
+        submit: {
+          message: trial
+            ? `You pay $0 today. Your first ${TRIAL_DAYS} days are free, then ${price}. Cancel any time before then and you won't be charged. Your card ships within 3–5 business days.`
+            : "Your plan starts today and your card ships within 3–5 business days.",
+        },
       },
       allow_promotion_codes: true,
       billing_address_collection: "auto",

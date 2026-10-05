@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { isValidTimeZone } from "@/lib/slots";
+import { agentSchema } from "@/lib/schemas";
 import type { Agent, Card } from "@/lib/types";
 import { safeUrl } from "@/lib/utils";
 
@@ -69,7 +69,7 @@ export async function saveCard(input: CardInput): Promise<Result<{ card: Card; f
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your details." };
   if (RESERVED.has(parsed.data.slug)) return { ok: false, error: "That link is reserved. Try another." };
 
-  const { data: existing } = await supabase.from("cards").select("id, first_printed_at").eq("user_id", user.id).maybeSingle();
+  const { data: existing } = await supabase.from("cards").select("id, first_printed_at").eq("user_id", user.id).is("company_id", null).maybeSingle();
   const firstPrint = parsed.data.published && !existing?.first_printed_at;
   const values = {
     ...parsed.data,
@@ -91,22 +91,6 @@ export async function saveCard(input: CardInput): Promise<Result<{ card: Card; f
   return { ok: true, data: { card: data as Card, firstPrint } };
 }
 
-const agentSchema = z.object({
-  business_name: text(120),
-  description: text(4000),
-  services: text(4000),
-  faq: text(6000),
-  tone: z.enum(["friendly", "professional", "enthusiastic", "concise"]).default("friendly"),
-  website_url: url,
-  knowledge: text(30000),
-  booking_enabled: z.boolean().default(true),
-  timezone: z.string().refine(isValidTimeZone, "Pick a valid timezone."),
-  work_days: z.array(z.number().int().min(0).max(6)).max(7).default([1, 2, 3, 4, 5]),
-  day_start: z.string().regex(/^\d{2}:\d{2}$/),
-  day_end: z.string().regex(/^\d{2}:\d{2}$/),
-  slot_minutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(90)]),
-});
-
 export type AgentInput = z.input<typeof agentSchema>;
 
 export async function saveAgent(input: AgentInput): Promise<Result<{ agent: Agent }>> {
@@ -116,7 +100,7 @@ export async function saveAgent(input: AgentInput): Promise<Result<{ agent: Agen
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your details." };
   if (parsed.data.day_start >= parsed.data.day_end) return { ok: false, error: "Your day must end after it starts." };
 
-  const { data: card } = await supabase.from("cards").select("id").eq("user_id", user.id).maybeSingle();
+  const { data: card } = await supabase.from("cards").select("id").eq("user_id", user.id).is("company_id", null).maybeSingle();
   if (!card) return { ok: false, error: "Create your card first." };
 
   const { data, error } = await supabase
@@ -137,5 +121,16 @@ export async function setAppointmentStatus(id: string, status: "cancelled" | "co
   if (error) return { ok: false, error: error.code === "23505" ? "That time has been booked again." : "Could not update the appointment." };
   revalidatePath("/dashboard/appointments");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function setLeadStatus(id: string, status: "new" | "contacted" | "won" | "lost"): Promise<Result> {
+  const { supabase, user } = await getUser();
+  if (!user) return { ok: false, error: "Please sign in again." };
+  if (!z.string().uuid().safeParse(id).success || !["new", "contacted", "won", "lost"].includes(status)) return { ok: false, error: "Unknown lead." };
+  const { error } = await supabase.from("leads").update({ status }).eq("id", id).eq("owner_id", user.id);
+  if (error) return { ok: false, error: "Could not update the lead." };
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/company/leads");
   return { ok: true };
 }

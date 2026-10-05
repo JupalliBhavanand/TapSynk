@@ -1,9 +1,13 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BarChart3,
   Bot,
+  Building2,
   CalendarCheck,
+  Gift,
   Globe,
+  Handshake,
   Lock,
   Nfc,
   QrCode,
@@ -15,12 +19,21 @@ import {
 } from "lucide-react";
 import { CardPrinter } from "@/components/CardPrinter";
 import { HeroDemo } from "@/components/HeroDemo";
+import { CompanyPricing } from "@/components/CompanyPricing";
 import { PricingTable } from "@/components/PricingTable";
 import { Reveal } from "@/components/Reveal";
 import { SITE_URL } from "@/lib/env";
 import { PLANS } from "@/lib/plans";
 
 const faqs = [
+  {
+    q: "Is the first month really free?",
+    a: "Yes. Individual Virtual and AI Card plans cost $0 for the first 30 days, and your NFC card still ships free. After that your plan's price starts automatically. Cancel any time in the first month and you won't be charged. One free month per account.",
+  },
+  {
+    q: "Can I get cards for my whole team?",
+    a: "Yes. The Company plan gives every employee a branded card, a team analytics dashboard and one monthly bill. It's priced per card with a team discount of 10% to 20% depending on team size. Company plans are billed monthly and don't include a free month.",
+  },
   {
     q: "Does the NFC card work with every phone?",
     a: "Yes. Every modern iPhone (XR and newer) and almost every Android phone reads NFC without an app. For older phones there's a QR code on the back that opens the same card.",
@@ -200,14 +213,42 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ───── growth features ───── */}
+      <section id="features" className="mx-auto max-w-6xl scroll-mt-16 px-5 py-24">
+        <Reveal className="max-w-2xl">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Grow from every tap</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">Turn introductions into customers</h2>
+          <p className="mt-4 text-lg text-ink-2">TapSync doesn't just share your details. It brings people back to you and shows you what's working.</p>
+        </Reveal>
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: Handshake, t: "Lead capture", d: "Visitors tap “Share my contact” and their details land in your dashboard, ready to follow up or export to CSV." },
+            { icon: BarChart3, t: "Real analytics", d: "Daily views, saves, leads, AI chats and bookings, plus whether people tapped your card, scanned the QR or opened a link." },
+            { icon: Building2, t: "Company cards", d: "Branded cards for your whole team, a leaderboard of top performers and one monthly bill with a team discount." },
+            { icon: Gift, t: "First month free", d: "Try everything for 30 days for $0, with your physical card shipped free. Cancel any time." },
+          ].map((f, i) => (
+            <Reveal key={f.t} delay={i * 80}>
+              <div className="card-surface h-full p-6">
+                <f.icon className="h-6 w-6 text-brand" />
+                <h3 className="mt-4 font-bold">{f.t}</h3>
+                <p className="mt-1.5 text-sm text-ink-2">{f.d}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* ───── pricing ───── */}
       <section id="pricing" className="mx-auto max-w-6xl scroll-mt-16 px-5 py-24">
         <Reveal className="mb-10 text-center">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Pricing</p>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight">Simple plans. Card included.</h2>
-          <p className="mt-3 text-ink-2">Every plan ships a premium NFC card to your door for free.</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">First month free. Card included.</h2>
+          <p className="mt-3 text-ink-2">Pay $0 for 30 days. Every plan ships a premium NFC card to your door for free.</p>
         </Reveal>
         <PricingTable />
+        <div className="mt-16">
+          <CompanyPricing />
+        </div>
       </section>
 
       {/* ───── FAQ ───── */}
@@ -233,7 +274,7 @@ export default function HomePage() {
         <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1d5bff] to-[#0f1426] px-8 py-16 text-center text-white">
           <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.4)_1px,transparent_1px)] [background-size:22px_22px]" />
           <h2 className="relative text-4xl font-bold tracking-tight">Make every introduction count</h2>
-          <p className="relative mx-auto mt-3 max-w-xl text-white/75">Design your card free. Go live with a plan when you're ready.</p>
+          <p className="relative mx-auto mt-3 max-w-xl text-white/75">Design your card free, then go live with your first month on us.</p>
           <Link href="/signup" className="btn btn-cream relative mt-8 px-7 py-3.5 text-base">
             Create your card <ArrowRight className="h-4 w-4" />
           </Link>

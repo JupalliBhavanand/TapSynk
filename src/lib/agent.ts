@@ -138,6 +138,7 @@ async function runTool(name: string, input: unknown, card: Card, agent: Agent, t
         ends_at: new Date(new Date(startIso).getTime() + agent.slot_minutes * 60000).toISOString(),
       });
     if (error) return { error: error.code === "23505" ? "That time was just taken. Fetch slots again." : "Booking failed. Try again." };
+    await createAdminClient().rpc("bump_card_stat", { p_slug: card.slug, p_kind: "booking" });
     return { booked: true, when: formatInZone(startIso, tz), timezone: tz, with: card.full_name };
   }
   return { error: `Unknown tool ${name}` };

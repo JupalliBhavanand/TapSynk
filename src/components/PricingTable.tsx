@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
-import { INTERVALS, PLANS, savingsPercent, type BillingInterval, type Tier } from "@/lib/plans";
+import { INTERVALS, PLANS, TRIAL_DAYS, savingsPercent, type BillingInterval, type Tier } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 export function PricingTable({
   mode = "marketing",
   currentTier,
   initialInterval = "year",
+  trial = true,
 }: {
   mode?: "marketing" | "dashboard";
   currentTier?: Tier | null;
   initialInterval?: BillingInterval;
+  /** Whether this visitor still gets the free first month. */
+  trial?: boolean;
 }) {
   const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [loading, setLoading] = useState<Tier | null>(null);
@@ -87,13 +90,31 @@ export function PricingTable({
               <div className="relative">
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 <p className={cn("mt-1 text-sm", featured ? "text-white/70" : "text-muted")}>{plan.tagline}</p>
-                <div className="mt-6 flex items-end gap-1">
-                  <span className="text-5xl font-extrabold tracking-tight">${plan.prices[interval]}</span>
-                  <span className={cn("mb-1.5 text-sm", featured ? "text-white/60" : "text-muted")}>{INTERVALS[interval].short}</span>
-                </div>
-                <p className={cn("mt-1 h-5 text-sm font-semibold", featured ? "text-brand-2" : "text-success")}>
-                  {save > 0 ? `Save ${save}% vs monthly` : "Cancel any time"}
-                </p>
+                {trial && !isCurrent ? (
+                  <>
+                    <span className={cn("mt-6 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold", featured ? "bg-success/20 text-[#5ff0ae]" : "bg-success/10 text-success")}>
+                      FIRST MONTH FREE
+                    </span>
+                    <div className="mt-3 flex items-end gap-2">
+                      <span className="text-5xl font-extrabold tracking-tight">$0</span>
+                      <span className={cn("mb-1.5 text-sm", featured ? "text-white/60" : "text-muted")}>for {TRIAL_DAYS} days</span>
+                    </div>
+                    <p className={cn("mt-1 text-sm", featured ? "text-white/70" : "text-muted")}>
+                      then <span className={cn("font-semibold", featured ? "text-white" : "text-ink")}>${plan.prices[interval]}{INTERVALS[interval].short}</span>
+                      {save > 0 && <span className={cn("font-semibold", featured ? "text-brand-2" : "text-success")}> · save {save}%</span>}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-6 flex items-end gap-1">
+                      <span className="text-5xl font-extrabold tracking-tight">${plan.prices[interval]}</span>
+                      <span className={cn("mb-1.5 text-sm", featured ? "text-white/60" : "text-muted")}>{INTERVALS[interval].short}</span>
+                    </div>
+                    <p className={cn("mt-1 h-5 text-sm font-semibold", featured ? "text-brand-2" : "text-success")}>
+                      {save > 0 ? `Save ${save}% vs monthly` : "Cancel any time"}
+                    </p>
+                  </>
+                )}
                 <ul className="mt-6 space-y-3 text-sm">
                   {plan.features.map((f) => (
                     <li key={f} className="flex gap-3">
@@ -106,7 +127,7 @@ export function PricingTable({
               <div className="relative mt-8 pt-2">
                 {mode === "marketing" ? (
                   <Link href={`/signup?next=${encodeURIComponent(next)}`} className={cn("btn w-full", featured ? "btn-primary" : "btn-dark")}>
-                    Get {plan.name}
+                    {trial ? "Start free month" : `Get ${plan.name}`}
                   </Link>
                 ) : (
                   <button
@@ -116,11 +137,11 @@ export function PricingTable({
                     className={cn("btn w-full", featured ? "btn-primary" : "btn-dark")}
                   >
                     {loading === tier && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {isCurrent ? "Your current plan" : loading === tier ? "Opening secure checkout…" : `Choose ${plan.name}`}
+                    {isCurrent ? "Your current plan" : loading === tier ? "Opening secure checkout…" : trial ? "Start my free month" : `Choose ${plan.name}`}
                   </button>
                 )}
                 <p className={cn("mt-3 text-center text-xs", featured ? "text-white/50" : "text-muted")}>
-                  Physical NFC card + free shipping included
+                  {trial && !isCurrent ? "$0 today · cancel any time in the first month · NFC card ships free" : "Physical NFC card + free shipping included"}
                 </p>
               </div>
             </div>

@@ -1,20 +1,20 @@
 import "server-only";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { INTERVALS, PLANS, isInterval, isTier, type BillingInterval, type Tier } from "@/lib/plans";
+import { INTERVALS, PLANS, companyQuote, isInterval, isTier, type BillingInterval, type Tier } from "@/lib/plans";
 import { stripe } from "@/lib/stripe";
 
 /** Products get fixed ids so prices can be created inline from lib/plans.ts without dashboard setup. */
-export async function ensureProduct(tier: Tier) {
-  const id = `tapsync_${tier}`;
+export async function ensureProduct(tier: Tier, company = false) {
+  const id = company ? `tapsync_company_${tier}` : `tapsync_${tier}`;
   try {
     await stripe().products.retrieve(id);
   } catch {
     try {
       await stripe().products.create({
         id,
-        name: `TapSync ${PLANS[tier].name}`,
-        description: PLANS[tier].tagline,
+        name: company ? `TapSync Company · ${PLANS[tier].name} (per employee)` : `TapSync ${PLANS[tier].name}`,
+        description: company ? "Monthly price per employee card, team discount applied." : PLANS[tier].tagline,
       });
     } catch (e) {
       // Another request created it at the same moment.
@@ -33,14 +33,46 @@ export async function priceData(tier: Tier, interval: BillingInterval) {
   };
 }
 
+/** Per-seat monthly price for a company; the discount bracket depends on the seat count. */
+export async function companyPriceData(tier: Tier, seats: number) {
+  return {
+    currency: "usd",
+    product: await ensureProduct(tier, true),
+    unit_amount: companyQuote(tier, seats).unit,
+    recurring: { interval: "month" as const, interval_count: 1 },
+  };
+}
+
 function receiptNumber(sessionId: string, created: number) {
   const d = new Date(created * 1000);
   const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
   return `TXN-${ymd}-${sessionId.slice(-8).toUpperCase()}`;
 }
 
+/** Mirrors a company's Stripe subscription onto its companies row. */
+async function syncCompany(sub: Stripe.Subscription) {
+  const companyId = sub.metadata?.company_id;
+  if (!companyId) return;
+  const item = sub.items.data[0];
+  const periodEnd = item?.current_period_end;
+  const tier = sub.metadata?.tier;
+  await createAdminClient()
+    .from("companies")
+    .update({
+      status: sub.status,
+      ...(isTier(tier) ? { tier } : {}),
+      ...(item?.quantity ? { seats: item.quantity } : {}),
+      stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+      stripe_subscription_id: sub.id,
+      current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", companyId);
+}
+
 /** Mirrors a Stripe subscription into Supabase. Safe to call repeatedly. */
 export async function syncSubscription(sub: Stripe.Subscription) {
+  if (sub.metadata?.kind === "company") return syncCompany(sub);
   const userId = sub.metadata?.user_id;
   if (!userId) return;
   const tier = sub.metadata?.tier;
@@ -80,10 +112,17 @@ export async function fulfillCheckout(sessionId: string) {
 
   const sub = session.subscription as Stripe.Subscription | null;
   if (sub) await syncSubscription(sub);
+  const isCompany = session.metadata?.kind === "company";
+  const companyId = isCompany ? session.metadata?.company_id ?? null : null;
+  const quantity = Number(session.metadata?.seats) || 1;
 
   const pm = sub?.default_payment_method as Stripe.PaymentMethod | null | undefined;
   const shipping = session.collected_information?.shipping_details;
   const admin = createAdminClient();
+  // The free month can only be used once per account.
+  if (!isCompany && sub?.status === "trialing") {
+    await admin.from("profiles").update({ trial_used_at: new Date().toISOString() }).eq("id", userId).is("trial_used_at", null);
+  }
   await admin.from("orders").upsert(
     {
       user_id: userId,
@@ -91,6 +130,8 @@ export async function fulfillCheckout(sessionId: string) {
       receipt_number: receiptNumber(session.id, session.created),
       tier,
       billing_interval: interval,
+      company_id: companyId,
+      quantity,
       amount_subtotal: session.amount_subtotal ?? 0,
       amount_discount: session.total_details?.amount_discount ?? 0,
       amount_tax: session.total_details?.amount_tax ?? 0,

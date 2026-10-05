@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { getPublicCard } from "@/lib/data";
 import { REQUIRE_SUBSCRIPTION, SITE_URL } from "@/lib/env";
+import { parseSource } from "@/lib/source";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isActive } from "@/lib/types";
 import { slugify } from "@/lib/utils";
@@ -20,7 +21,7 @@ async function fetchPhoto(url: string) {
   }
 }
 
-export async function GET(_: NextRequest, ctx: RouteContext<"/api/vcard/[slug]">) {
+export async function GET(request: NextRequest, ctx: RouteContext<"/api/vcard/[slug]">) {
   const { slug } = await ctx.params;
   const found = await getPublicCard(slug);
   if (!found || !found.card.published || (REQUIRE_SUBSCRIPTION && !isActive(found.subscription))) {
@@ -32,7 +33,7 @@ export async function GET(_: NextRequest, ctx: RouteContext<"/api/vcard/[slug]">
   const photoUrl = card.avatar_url && storageHost && new URL(card.avatar_url).host === storageHost ? card.avatar_url : "";
   const vcf = buildVCard(card, `${SITE_URL}/c/${card.slug}`, photoUrl ? await fetchPhoto(photoUrl) : undefined);
   after(async () => {
-      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "save" });
+      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "save", p_source: parseSource(request.nextUrl.searchParams.get("s")) });
     });
 
   return new NextResponse(vcf, {

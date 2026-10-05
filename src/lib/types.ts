@@ -30,13 +30,15 @@ export interface Card {
   views: number;
   saves: number;
   ai_opens: number;
+  company_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface Agent {
   id: string;
-  card_id: string;
+  card_id: string | null;
+  company_id: string | null;
   user_id: string;
   business_name: string;
   description: string;
@@ -103,6 +105,49 @@ export interface Order {
   shipping_name: string | null;
   shipping_address: ShippingAddress | null;
   fulfillment_status: "processing" | "printing" | "shipped" | "delivered";
+  company_id: string | null;
+  quantity: number;
+  created_at: string;
+}
+
+export interface Company {
+  id: string;
+  owner_id: string;
+  name: string;
+  website: string;
+  address: string;
+  logo_url: string;
+  accent: string;
+  tier: Tier;
+  seats: number;
+  status: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  current_period_end: string | null;
+  created_at: string;
+}
+
+export interface Lead {
+  id: string;
+  card_id: string;
+  owner_id: string;
+  company_id: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  message: string;
+  status: "new" | "contacted" | "won" | "lost";
+  created_at: string;
+}
+
+export type EventKind = "view" | "save" | "ai" | "lead" | "booking";
+export type EventSource = "tap" | "qr" | "link";
+
+export interface CardEvent {
+  card_id: string;
+  kind: EventKind;
+  source: EventSource;
   created_at: string;
 }
 

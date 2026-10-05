@@ -6,6 +6,7 @@ import { LogoMark } from "@/components/Logo";
 import { ProfileCard } from "@/components/ProfileCard";
 import { getPublicCard } from "@/lib/data";
 import { REQUIRE_SUBSCRIPTION, SITE_URL } from "@/lib/env";
+import { parseSource } from "@/lib/source";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
 import { isActive } from "@/lib/types";
@@ -33,8 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function PublicCardPage({ params }: Props) {
+export default async function PublicCardPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const source = parseSource((await searchParams).s);
   const found = await getPublicCard(slug);
   if (!found) notFound();
   const { card, subscription, agent } = found;
@@ -49,7 +51,7 @@ export default async function PublicCardPage({ params }: Props) {
 
   if (live && !isOwner) {
     after(async () => {
-      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "view" });
+      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "view", p_source: source });
     });
   }
 
@@ -78,7 +80,7 @@ export default async function PublicCardPage({ params }: Props) {
             </Link>
           </div>
         )}
-        <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} />} />
+        <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} source={source} />} />
         <Link href="/" className="mx-auto mt-6 flex w-fit items-center gap-2 text-xs font-medium text-muted hover:text-ink">
           <LogoMark className="h-5 w-5" /> Get your own AI business card
         </Link>

@@ -23,7 +23,9 @@ export const PLANS: Record<Tier, Plan> = {
       "One-tap “Save contact” for iPhone & Android",
       "QR code backup and shareable link",
       "Edit your details any time",
-      "View & save analytics",
+      "Lead capture: visitors share their contact back",
+      "Analytics: views, saves and tap vs QR vs link",
+      "Export your leads to CSV",
     ],
     prices: { month: 20, quarter: 49, year: 149 },
   },
@@ -38,10 +40,59 @@ export const PLANS: Record<Tier, Plan> = {
       "Answers every visitor question 24/7",
       "Books appointments straight into your dashboard",
       "AI conversation & booking analytics",
+      "Priority support",
     ],
     prices: { month: 49, quarter: 119, year: 399 },
   },
 };
+
+/** Every new individual subscriber gets their first month free (once per account). */
+export const TRIAL_DAYS = 30;
+
+// ───────────────────────── Company plans ─────────────────────────
+// Billed monthly per employee card ("seat"). No free trial; every company gets a
+// discount on the individual monthly price, growing with team size.
+
+export const COMPANY_MIN_SEATS = 2;
+export const COMPANY_MAX_SEATS = 500;
+
+export const COMPANY_DISCOUNTS = [
+  { minSeats: 2, percent: 10, label: "2–9 cards" },
+  { minSeats: 10, percent: 15, label: "10–24 cards" },
+  { minSeats: 25, percent: 20, label: "25+ cards" },
+] as const;
+
+export const COMPANY_FEATURES = [
+  "A branded card for every employee",
+  "Company logo, colours and website on every card",
+  "Team analytics: views, saves, leads and bookings per card",
+  "See your top performers at a glance",
+  "One shared AI agent that knows your company (AI cards)",
+  "Physical cards for the whole team, shipped to your office",
+  "One monthly bill for the whole team",
+];
+
+export function companyDiscountPercent(seats: number) {
+  let percent = 0;
+  for (const d of COMPANY_DISCOUNTS) if (seats >= d.minSeats) percent = d.percent;
+  return percent;
+}
+
+/** Monthly company bill in cents: list price, discount and total. */
+export function companyQuote(tier: Tier, seats: number) {
+  const list = PLANS[tier].prices.month * 100;
+  const percent = companyDiscountPercent(seats);
+  const unit = Math.round(list * (1 - percent / 100));
+  return {
+    seats,
+    percent,
+    listUnit: list,
+    unit,
+    subtotal: list * seats,
+    discount: (list - unit) * seats,
+    total: unit * seats,
+  };
+}
 
 export const INTERVALS: Record<
   BillingInterval,
