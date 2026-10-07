@@ -2,9 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Bot, Check, ImagePlus, Loader2, Printer as PrinterIcon, UserPlus, X } from "lucide-react";
+import { AI_BUTTON } from "@/lib/greeting";
 import { CardPrinter } from "@/components/CardPrinter";
 import { PhysicalCard } from "@/components/PhysicalCard";
 import { ProfileCard } from "@/components/ProfileCard";
+import { SocialFields } from "@/components/SocialFields";
 import { createClient } from "@/lib/supabase/client";
 import type { Card, Socials } from "@/lib/types";
 import { cn, slugify } from "@/lib/utils";
@@ -72,7 +74,10 @@ export function CardEditor({
     const supabase = createClient();
     const ext = file.type.split("/")[1];
     const path = `${userId}/${field === "avatar_url" ? "avatar" : "logo"}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("card-assets").upload(path, file, { contentType: file.type, upsert: false });
+    const { error } = await supabase.storage
+      .from("card-assets")
+      .upload(path, file, { contentType: file.type, upsert: false })
+      .catch(() => ({ error: true }));
     setUploading(null);
     if (error) return setStatus({ error: "Upload failed. Please try again." });
     set(field, supabase.storage.from("card-assets").getPublicUrl(path).data.publicUrl);
@@ -145,13 +150,9 @@ export function CardEditor({
 
           <section className="card-surface p-6">
             <h2 className="font-bold">Social links</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="LinkedIn" value={form.socials.linkedin ?? ""} onChange={(v) => setSocial("linkedin", v)} placeholder="linkedin.com/in/you" />
-              <Field label="Instagram" value={form.socials.instagram ?? ""} onChange={(v) => setSocial("instagram", v)} placeholder="instagram.com/you" />
-              <Field label="X (Twitter)" value={form.socials.x ?? ""} onChange={(v) => setSocial("x", v)} placeholder="x.com/you" />
-              <Field label="Facebook" value={form.socials.facebook ?? ""} onChange={(v) => setSocial("facebook", v)} />
-              <Field label="YouTube" value={form.socials.youtube ?? ""} onChange={(v) => setSocial("youtube", v)} />
-              <Field label="WhatsApp number" value={form.socials.whatsapp ?? ""} onChange={(v) => setSocial("whatsapp", v)} placeholder="+1 555 123 4567" />
+            <p className="text-sm text-muted">Paste a link or just your @handle. Each one shows on your card with its logo.</p>
+            <div className="mt-4">
+              <SocialFields value={form.socials} onChange={setSocial} />
             </div>
           </section>
         </div>
@@ -161,7 +162,7 @@ export function CardEditor({
           <div className="mb-4 flex rounded-xl border border-line bg-white p-1 text-sm font-semibold">
             {(["profile", "card"] as const).map((v) => (
               <button key={v} type="button" onClick={() => setView(v)} className={cn("flex-1 rounded-lg py-2 transition", view === v ? "bg-navy text-white" : "text-muted")}>
-                {v === "profile" ? "Tap page" : "NFC card"}
+                {v === "profile" ? "Tap page" : "smart card"}
               </button>
             ))}
           </div>
@@ -171,7 +172,7 @@ export function CardEditor({
               actions={
                 <>
                   <span className="btn btn-dark w-full"><UserPlus className="h-4 w-4" /> Save contact</span>
-                  {aiPlan && <span className="btn btn-primary w-full"><Bot className="h-4 w-4" /> Talk to AI</span>}
+                  {aiPlan && <span className="btn btn-primary w-full"><Bot className="h-4 w-4" /> {AI_BUTTON}</span>}
                 </>
               }
             />
@@ -251,7 +252,12 @@ function ImageField({ label, value, busy, onFile, onClear }: { label: string; va
           {value && <button type="button" className="text-muted" onClick={onClear}>Remove</button>}
         </div>
       </div>
-      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ""; // lets the same file be picked again after an error
+          if (file) onFile(file);
+        }}
+      />
     </div>
   );
 }

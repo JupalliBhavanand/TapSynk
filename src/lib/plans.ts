@@ -18,7 +18,7 @@ export const PLANS: Record<Tier, Plan> = {
     name: "Virtual Card",
     tagline: "Your digital business card, one tap away.",
     features: [
-      "Premium NFC card shipped to your door",
+      "Premium smart card shipped to your door",
       "Live digital business card page",
       "One-tap “Save contact” for iPhone & Android",
       "QR code backup and shareable link",
@@ -35,9 +35,9 @@ export const PLANS: Record<Tier, Plan> = {
     tagline: "A card that talks, sells and books for you.",
     features: [
       "Everything in Virtual Card",
-      "“Talk to AI” marketing agent on your card",
+      "“Ask my AI anything” agent on your card",
       "AI learns from your website automatically",
-      "Answers every visitor question 24/7",
+      "Talks and listens in any language, 24/7",
       "Books appointments straight into your dashboard",
       "AI conversation & booking analytics",
       "Priority support",
@@ -117,7 +117,7 @@ export function savingsPercent(tier: Tier, interval: BillingInterval): number {
   return Math.round(((monthly - PLANS[tier].prices[interval]) / monthly) * 100);
 }
 
-/** Countries we ship physical NFC cards to (Stripe Checkout needs an explicit list). */
+/** Countries we ship physical smart cards to (Stripe Checkout needs an explicit list). */
 export const SHIPPING_COUNTRIES = [
   "US", "CA", "GB", "IE", "AU", "NZ", "IN", "AE", "SA", "QA", "SG", "MY", "PH", "JP",
   "DE", "FR", "ES", "IT", "NL", "BE", "SE", "NO", "DK", "FI", "CH", "AT", "PT", "PL", "ZA", "MX", "BR",

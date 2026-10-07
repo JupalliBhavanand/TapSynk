@@ -5,11 +5,12 @@ import { after } from "next/server";
 import { LogoMark } from "@/components/Logo";
 import { ProfileCard } from "@/components/ProfileCard";
 import { getPublicCard } from "@/lib/data";
+import { introLine } from "@/lib/greeting";
 import { REQUIRE_SUBSCRIPTION, SITE_URL } from "@/lib/env";
 import { parseSource } from "@/lib/source";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
-import { isActive } from "@/lib/types";
+import { hasAi, isActive } from "@/lib/types";
 import { CardActions } from "./CardActions";
 
 type Props = PageProps<"/c/[slug]">;
@@ -46,7 +47,7 @@ export default async function PublicCardPage({ params, searchParams }: Props) {
   const isOwner = user?.id === card.user_id;
   if (!live && !isOwner) notFound();
 
-  const aiEnabled = Boolean(agent) && isActive(subscription) && subscription?.tier === "ai";
+  const aiEnabled = Boolean(agent) && hasAi(subscription);
   const businessName = agent?.business_name || card.company || card.full_name;
 
   if (live && !isOwner) {
@@ -80,7 +81,7 @@ export default async function PublicCardPage({ params, searchParams }: Props) {
             </Link>
           </div>
         )}
-        <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} source={source} />} />
+        <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} intro={introLine(agent?.description)} booking={agent?.booking_enabled ?? false} logoUrl={card.logo_url || undefined} source={source} />} />
         <Link href="/" className="mx-auto mt-6 flex w-fit items-center gap-2 text-xs font-medium text-muted hover:text-ink">
           <LogoMark className="h-5 w-5" /> Get your own AI business card
         </Link>

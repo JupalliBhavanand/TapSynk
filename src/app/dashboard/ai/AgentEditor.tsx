@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Check, Globe, Loader2, Sparkles } from "lucide-react";
 import { ChatPanel } from "@/components/ChatWidget";
+import { introLine } from "@/lib/greeting";
 import type { Agent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { saveAgent, type AgentInput } from "../actions";
@@ -214,7 +215,7 @@ export function AgentEditor({
       <aside className="xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-sm font-semibold text-muted">Test your AI</p>
         {saved && slug ? (
-          <ChatPanel slug={slug} businessName={form.business_name || businessName} ownerName={ownerName} preview className="h-[600px] rounded-[24px] border border-line shadow-lg" />
+          <ChatPanel slug={slug} businessName={form.business_name || businessName} ownerName={ownerName} intro={introLine(form.description)} booking={form.booking_enabled} preview className="h-[600px] rounded-[24px] border border-line shadow-lg" />
         ) : (
           <div className="card-surface grid h-[300px] place-items-center p-8 text-center text-sm text-muted">{saved ? "Add an employee card to test your company AI." : "Save your AI agent to start chatting with it."}</div>
         )}

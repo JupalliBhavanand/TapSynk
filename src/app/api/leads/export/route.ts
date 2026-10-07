@@ -20,13 +20,13 @@ export async function GET(request: NextRequest) {
     const { data: cards } = await supabase.from("cards").select("id, full_name").in("id", [...new Set(leads.map((l) => l.card_id))]);
     names = Object.fromEntries((cards ?? []).map((c) => [c.id as string, c.full_name as string]));
   }
-  const header = ["Date", "Name", "Email", "Phone", "Company", "Note", "Status", ...(company ? ["Employee card"] : [])];
-  const rows = leads.map((l) => [l.created_at, l.name, l.email, l.phone, l.company, l.message, l.status, ...(company ? [names[l.card_id] ?? ""] : [])]);
+  const header = ["Date", "Name", "Email", "Phone", "Company", "Their message", "Status", "Your notes", ...(company ? ["Employee card"] : [])];
+  const rows = leads.map((l) => [l.created_at, l.name, l.email, l.phone, l.company, l.message, l.status, l.notes ?? "", ...(company ? [names[l.card_id] ?? ""] : [])]);
   const csv = [header, ...rows].map((r) => r.map((v) => cell(String(v ?? ""))).join(",")).join("\r\n");
   return new NextResponse(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="tapsync-${company ? "team-" : ""}leads.csv"`,
+      "content-disposition": `attachment; filename="tapsynk-${company ? "team-" : ""}leads.csv"`,
       "cache-control": "no-store",
     },
   });

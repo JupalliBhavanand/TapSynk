@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Receipt as ReceiptIcon } from "lucide-react";
 import { CompanyBill } from "@/components/CompanyPlanPicker";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import { PLANS } from "@/lib/plans";
 import { isActive, type Order } from "@/lib/types";
 import { formatMoney } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { PlanChanger } from "./PlanChanger";
 
 export default async function CompanyBillingPage({ searchParams }: PageProps<"/dashboard/company/billing">) {
   const sp = await searchParams;
-  const { supabase, company } = (await getDashboardData())!;
+  const { supabase, company } = await requireDashboardData();
   if (!company || !isActive(company)) redirect("/dashboard/company");
   const [{ count }, { data }] = await Promise.all([
     supabase.from("cards").select("id", { count: "exact", head: true }).eq("company_id", company.id),

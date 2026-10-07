@@ -31,7 +31,10 @@ export function ImageUpload({
     setBusy(true);
     const supabase = createClient();
     const path = `${userId}/${name}-${Date.now()}.${file.type.split("/")[1]}`;
-    const { error } = await supabase.storage.from("card-assets").upload(path, file, { contentType: file.type, upsert: false });
+    const { error } = await supabase.storage
+      .from("card-assets")
+      .upload(path, file, { contentType: file.type, upsert: false })
+      .catch(() => ({ error: true }));
     setBusy(false);
     if (error) return onError("Upload failed. Please try again.");
     onChange(supabase.storage.from("card-assets").getPublicUrl(path).data.publicUrl);
@@ -61,7 +64,12 @@ export function ImageUpload({
           {value && <button type="button" className="text-muted" onClick={() => onChange("")}>Remove</button>}
         </div>
       </div>
-      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ""; // lets the same file be picked again after an error
+          if (file) upload(file);
+        }}
+      />
     </div>
   );
 }

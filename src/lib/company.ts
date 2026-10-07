@@ -1,11 +1,11 @@
 import "server-only";
 import { emptyTotals, sinceIso, summarize, type Totals } from "@/lib/analytics";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import type { Card, CardEvent } from "@/lib/types";
 
 /** Employee cards plus their last-30-day numbers, for the team and analytics pages. */
 export async function getCompanyTeam() {
-  const data = (await getDashboardData())!;
+  const data = await requireDashboardData();
   const { supabase, company } = data;
   if (!company) return { ...data, cards: [] as Card[], perCard: {} as Record<string, Totals>, summary: summarize([]) };
   const [{ data: cards }, { data: events }] = await Promise.all([

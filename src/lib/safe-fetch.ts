@@ -44,7 +44,7 @@ export async function safeFetchHtml(input: string): Promise<{ url: string; html:
     const res = await fetch(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
-      headers: { "user-agent": "TapSyncBot/1.0 (+https://tapsync.app/bot)", accept: "text/html,application/xhtml+xml" },
+      headers: { "user-agent": "TapSynkBot/1.0 (+https://tapsync.app/bot)", accept: "text/html,application/xhtml+xml" },
     });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");

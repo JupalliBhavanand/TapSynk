@@ -1,7 +1,8 @@
 import { Bot, CalendarCheck, UserPlus } from "lucide-react";
 import { PhysicalCard } from "@/components/PhysicalCard";
+import { AI_BUTTON } from "@/lib/greeting";
 
-/** Phone + NFC card tapping loop for the hero. Pure CSS animation. */
+/** Phone + smart card tapping loop for the hero. Pure CSS animation. */
 export function HeroDemo() {
   return (
     <div className="relative mx-auto h-[520px] w-full max-w-[460px]" aria-hidden="true">
@@ -17,7 +18,7 @@ export function HeroDemo() {
               <UserPlus className="h-3.5 w-3.5" /> Save contact
             </div>
             <div className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 py-2.5 text-[11px] font-semibold text-white">
-              <Bot className="h-3.5 w-3.5" /> Talk to AI
+              <Bot className="h-3.5 w-3.5" /> {AI_BUTTON}
             </div>
           </div>
           <div className="mt-4 space-y-2">
@@ -28,7 +29,7 @@ export function HeroDemo() {
             </div>
           </div>
         </div>
-        {/* NFC waves */}
+        {/* smart waves */}
         <div className="pointer-events-none absolute left-1/2 top-[38%] -translate-x-1/2">
           {[0, 0.7, 1.4].map((d) => (
             <span key={d} className="ripple absolute -left-16 -top-16 h-32 w-32 rounded-full border-2 border-brand/50" style={{ animationDelay: `${d}s` }} />

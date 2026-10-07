@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Globe, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import { FacebookIcon, InstagramIcon, LinkedinIcon, XIcon, YoutubeIcon } from "@/components/BrandIcons";
+import { Globe, Mail, MapPin, Phone } from "lucide-react";
+import { SOCIAL_ICONS } from "@/components/BrandIcons";
+import { socialLinks } from "@/lib/socials";
 import type { Card } from "@/lib/types";
 import { initials, safeUrl } from "@/lib/utils";
 
@@ -30,15 +31,7 @@ function ContactRow({ href, icon, label, value }: { href?: string; icon: ReactNo
 
 /** The digital business card people see after tapping. */
 export function ProfileCard({ card, actions }: { card: CardView; actions?: ReactNode }) {
-  const s = card.socials ?? {};
-  const socials = [
-    { key: "linkedin", href: s.linkedin, icon: LinkedinIcon, label: "LinkedIn" },
-    { key: "instagram", href: s.instagram, icon: InstagramIcon, label: "Instagram" },
-    { key: "x", href: s.x, icon: XIcon, label: "X" },
-    { key: "facebook", href: s.facebook, icon: FacebookIcon, label: "Facebook" },
-    { key: "youtube", href: s.youtube, icon: YoutubeIcon, label: "YouTube" },
-    { key: "whatsapp", href: s.whatsapp ? `https://wa.me/${s.whatsapp.replace(/[^\d]/g, "")}` : "", icon: MessageCircle, label: "WhatsApp" },
-  ].filter((x) => x.href && (x.key === "whatsapp" || safeUrl(x.href)));
+  const socials = socialLinks(card.socials);
   const website = safeUrl(card.website);
 
   return (
@@ -82,12 +75,26 @@ export function ProfileCard({ card, actions }: { card: CardView; actions?: React
         </div>
 
         {socials.length > 0 && (
-          <div className="mt-5 flex flex-wrap gap-2">
-            {socials.map(({ key, href, icon: Icon, label }) => (
-              <a key={key} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className="grid h-11 w-11 place-items-center rounded-2xl bg-bg text-ink-2 transition hover:-translate-y-0.5 hover:bg-navy hover:text-white">
-                <Icon className="h-[18px] w-[18px]" />
-              </a>
-            ))}
+          <div className="mt-6">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Follow me</p>
+            <ul className="mt-3 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
+              {socials.map(({ key, href, label, bg }, i) => {
+                const Icon = SOCIAL_ICONS[key];
+                return (
+                  <li key={key} className="fade-up" style={{ animationDelay: `${120 + i * 50}ms` }}>
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-1.5" aria-label={label}>
+                      <span
+                        className="grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_18px_-10px_rgba(13,17,32,0.6)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_14px_24px_-12px_rgba(13,17,32,0.7)]"
+                        style={{ background: bg, color: key === "snapchat" ? "#111" : "#fff" }}
+                      >
+                        <Icon className="h-6 w-6" />
+                      </span>
+                      <span className="text-[11px] font-medium text-ink-2">{label}</span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </div>

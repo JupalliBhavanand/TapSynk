@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, BarChart3, Bot, IdCard, Users } from "lucide-react";
 import { ReceiptPrinter } from "@/components/ReceiptPrinter";
 import { fulfillCheckout } from "@/lib/billing";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import { orderToReceipt } from "@/lib/receipt";
 import { stripe } from "@/lib/stripe";
 import type { Order } from "@/lib/types";
@@ -12,12 +12,13 @@ export default async function SuccessPage({ searchParams }: PageProps<"/dashboar
   const sp = await searchParams;
   const sessionId = typeof sp.session_id === "string" && /^cs_[A-Za-z0-9_]+$/.test(sp.session_id) ? sp.session_id : null;
   if (!sessionId) redirect("/dashboard/billing");
-  const { supabase, user, name, card } = (await getDashboardData())!;
+  const { supabase, user, name, card } = await requireDashboardData();
 
   // Make sure this session belongs to the signed-in user before doing anything with it.
   const session = await stripe().checkout.sessions.retrieve(sessionId).catch(() => null);
   if (!session || (session.metadata?.user_id ?? session.client_reference_id) !== user.id) redirect("/dashboard/billing");
-  await fulfillCheckout(sessionId);
+  // The webhook records the order too, so a hiccup here just means the receipt shows on refresh.
+  await fulfillCheckout(sessionId).catch((e) => console.error("fulfillCheckout on success page", e));
 
   const { data } = await supabase.from("orders").select("*").eq("stripe_session_id", sessionId).maybeSingle();
   const order = data as Order | null;
@@ -47,16 +48,24 @@ export default async function SuccessPage({ searchParams }: PageProps<"/dashboar
         </div>
       ) : (
       <div className="fade-up mt-12 grid gap-4 sm:grid-cols-2" style={{ animationDelay: "3.4s" }}>
-        <Link href={card ? "/dashboard/card" : "/dashboard/card"} className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
+        <Link href="/dashboard/card" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
           <IdCard className="h-6 w-6 text-brand" />
           <span className="flex-1"><span className="block font-semibold">{card?.published ? "Your card is live" : "Publish your card"}</span><span className="text-sm text-muted">{card?.published ? "Polish your details" : "Print it on screen now"}</span></span>
           <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
         </Link>
-        <Link href="/dashboard/ai" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
-          <Bot className="h-6 w-6 text-brand" />
-          <span className="flex-1"><span className="block font-semibold">Train your AI agent</span><span className="text-sm text-muted">Learn from your website</span></span>
-          <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
-        </Link>
+        {order?.tier === "ai" ? (
+          <Link href="/dashboard/ai" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
+            <Bot className="h-6 w-6 text-brand" />
+            <span className="flex-1"><span className="block font-semibold">Train your AI agent</span><span className="text-sm text-muted">Learn from your website</span></span>
+            <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
+          </Link>
+        ) : (
+          <Link href="/dashboard/analytics" className="card-surface group flex items-center gap-4 p-5 transition hover:border-brand/40">
+            <BarChart3 className="h-6 w-6 text-brand" />
+            <span className="flex-1"><span className="block font-semibold">Watch your taps</span><span className="text-sm text-muted">Views, saves and leads in one place</span></span>
+            <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-1" />
+          </Link>
+        )}
       </div>
       )}
     </div>

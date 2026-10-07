@@ -22,7 +22,9 @@ async function fetchPhoto(url: string) {
 }
 
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/vcard/[slug]">) {
-  const { slug } = await ctx.params;
+  const { slug: requestedSlug } = await ctx.params;
+  // A real .vcf URL helps browsers identify the file. Keep older links working.
+  const slug = requestedSlug.replace(/\.vcf$/i, "");
   const found = await getPublicCard(slug);
   if (!found || !found.card.published || (REQUIRE_SUBSCRIPTION && !isActive(found.subscription))) {
     return new NextResponse("Not found", { status: 404 });
@@ -30,16 +32,26 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/vcard/[s
   const { card } = found;
   // Only fetch photos from our own Supabase storage.
   const storageHost = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host : "";
-  const photoUrl = card.avatar_url && storageHost && new URL(card.avatar_url).host === storageHost ? card.avatar_url : "";
+  let photoUrl = "";
+  try {
+    if (card.avatar_url && storageHost) {
+      const avatar = new URL(card.avatar_url);
+      if (avatar.protocol === "https:" && avatar.host === storageHost) photoUrl = avatar.href;
+    }
+  } catch {
+    // An invalid optional photo must not prevent saving the contact itself.
+  }
   const vcf = buildVCard(card, `${SITE_URL}/c/${card.slug}`, photoUrl ? await fetchPhoto(photoUrl) : undefined);
   after(async () => {
-      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "save", p_source: parseSource(request.nextUrl.searchParams.get("s")) });
-    });
+    await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "save", p_source: parseSource(request.nextUrl.searchParams.get("s")) });
+  });
 
   return new NextResponse(vcf, {
     headers: {
       "content-type": "text/vcard; charset=utf-8",
-      "content-disposition": `attachment; filename="${slugify(card.full_name) || "contact"}.vcf"`,
+      // Allow the OS contact preview instead of always forcing a download.
+      // Browsers without a preview still have an explicit download fallback.
+      "content-disposition": `${request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline"}; filename="${slugify(card.full_name) || "contact"}.vcf"`,
       "cache-control": "no-store",
     },
   });

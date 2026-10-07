@@ -102,7 +102,7 @@ export function CompanyBill({ tier, seats, dark = false }: { tier: Tier; seats: 
       <p className={cn("mb-3 text-xs font-bold tracking-[0.15em]", dark ? "text-brand-2" : "text-brand")}>MONTHLY BILL</p>
       <div className={row}><span>{seats} × {PLANS[tier].name} @ {formatMoney(q.listUnit)}</span><span className="tabular-nums">{formatMoney(q.subtotal)}</span></div>
       <div className={cn(row, "text-success")}><span>Team discount ({q.percent}%)</span><span className="tabular-nums">−{formatMoney(q.discount)}</span></div>
-      <div className={row}><span>{seats} × NFC cards + shipping</span><span>INCLUDED</span></div>
+      <div className={row}><span>{seats} × smart cards + shipping</span><span>INCLUDED</span></div>
       <div className={cn(row, "mt-3 border-t border-dashed pt-3 text-base font-bold", dark ? "border-white/20 text-white" : "border-cream-line text-ink")}>
         <span>Total / month</span><span className="tabular-nums">{formatMoney(q.total)}</span>
       </div>

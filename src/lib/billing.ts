@@ -7,20 +7,26 @@ import { stripe } from "@/lib/stripe";
 /** Products get fixed ids so prices can be created inline from lib/plans.ts without dashboard setup. */
 export async function ensureProduct(tier: Tier, company = false) {
   const id = company ? `tapsync_company_${tier}` : `tapsync_${tier}`;
+  const name = company ? `TapSynk Company · ${PLANS[tier].name} (per employee)` : `TapSynk ${PLANS[tier].name}`;
+  let product: Stripe.Product;
   try {
-    await stripe().products.retrieve(id);
+    product = await stripe().products.retrieve(id);
   } catch {
     try {
       await stripe().products.create({
         id,
-        name: company ? `TapSync Company · ${PLANS[tier].name} (per employee)` : `TapSync ${PLANS[tier].name}`,
+        name,
         description: company ? "Monthly price per employee card, team discount applied." : PLANS[tier].tagline,
       });
     } catch (e) {
       // Another request created it at the same moment.
       if ((e as { code?: string }).code !== "resource_already_exists") throw e;
+      await stripe().products.update(id, { name });
     }
+    return id;
   }
+  // Rebrand existing checkout products without changing their stable IDs or prices.
+  if (product.name !== name) await stripe().products.update(id, { name });
   return id;
 }
 
@@ -94,6 +100,57 @@ export async function syncSubscription(sub: Stripe.Subscription) {
       },
       { onConflict: "user_id" },
     );
+  // A scheduled switch is done once Stripe has applied it, or was dropped if the schedule is gone.
+  const pending = createAdminClient().from("subscriptions").update({ pending_tier: null, pending_interval: null, pending_change_at: null, stripe_schedule_id: null }).eq("user_id", userId);
+  if (!sub.schedule) await pending;
+  else if (isTier(tier) && isInterval(interval)) await pending.eq("pending_tier", tier).eq("pending_interval", interval);
+}
+
+/** Stops a scheduled switch; the subscription carries on unchanged. */
+export async function releaseSchedule(scheduleId: string | null | undefined) {
+  if (!scheduleId) return;
+  try {
+    await stripe().subscriptionSchedules.release(scheduleId);
+  } catch (e) {
+    // Already released or finished.
+    if ((e as { code?: string }).code !== "resource_missing" && !/released|completed|canceled/i.test(String((e as Error).message))) throw e;
+  }
+}
+
+/**
+ * Keeps the current plan until the paid period ends, then moves to the new one
+ * (used for AI Card → Virtual Card, so nobody loses AI time they paid for).
+ * Returns when the switch happens.
+ */
+export async function scheduleSwitchAtPeriodEnd(sub: Stripe.Subscription, tier: Tier, interval: BillingInterval) {
+  await releaseSchedule(typeof sub.schedule === "string" ? sub.schedule : sub.schedule?.id);
+  const item = sub.items.data[0]!;
+  const schedule = await stripe().subscriptionSchedules.create({ from_subscription: sub.id });
+  const now = schedule.phases[0]!;
+  // Promo codes used at checkout stay on the current phase.
+  const discounts = (now.discounts ?? []).flatMap((d): Stripe.SubscriptionScheduleUpdateParams.Phase.Discount[] =>
+    d.discount ? [{ discount: typeof d.discount === "string" ? d.discount : d.discount.id }] : d.coupon ? [{ coupon: typeof d.coupon === "string" ? d.coupon : d.coupon.id }] : [],
+  );
+  await stripe().subscriptionSchedules.update(schedule.id, {
+    end_behavior: "release",
+    phases: [
+      {
+        items: [{ price: item.price.id, quantity: item.quantity ?? 1 }],
+        start_date: now.start_date,
+        end_date: item.current_period_end,
+        proration_behavior: "none",
+        metadata: { ...sub.metadata },
+        ...(discounts.length ? { discounts } : {}),
+      },
+      {
+        items: [{ price_data: await priceData(tier, interval), quantity: 1 }],
+        duration: INTERVALS[interval].stripe,
+        proration_behavior: "none",
+        metadata: { ...sub.metadata, tier, interval },
+      },
+    ],
+  });
+  return { scheduleId: schedule.id, at: new Date(item.current_period_end * 1000).toISOString() };
 }
 
 /**

@@ -13,7 +13,7 @@ export function orderToReceipt(order: Order, fallbackName: string): ReceiptData 
     items: order.company_id
       ? [
           { label: `${order.quantity}X Company ${PLANS[order.tier].name} (Monthly)`, amount: order.amount_subtotal },
-          { label: `${order.quantity}X Premium NFC Card (printed)`, amount: null },
+          { label: `${order.quantity}X Premium Smart Card (printed)`, amount: null },
           { label: "1X Team analytics dashboard", amount: null },
         ]
       : [
@@ -21,7 +21,7 @@ export function orderToReceipt(order: Order, fallbackName: string): ReceiptData 
             label: `1X ${PLANS[order.tier].name} (${INTERVALS[order.billing_interval].label})${order.amount_subtotal === 0 ? ` · FIRST ${TRIAL_DAYS} DAYS FREE` : ""}`,
             amount: order.amount_subtotal,
           },
-          { label: "1X Premium NFC Card (printed)", amount: null },
+          { label: "1X Premium Smart Card (printed)", amount: null },
           { label: `1X AI-ready card page${order.tier === "ai" ? " + AI agent" : ""}`, amount: null },
         ],
     subtotal: order.amount_subtotal,

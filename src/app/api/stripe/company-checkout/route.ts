@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
       ...(company.stripe_customer_id ? { customer: company.stripe_customer_id } : { customer_email: user.email }),
       client_reference_id: user.id,
       metadata,
-      subscription_data: { metadata, description: `TapSync Company · ${company.name} · ${seats} × ${PLANS[tier].name}` },
+      subscription_data: { metadata, description: `TapSynk Company · ${company.name} · ${seats} × ${PLANS[tier].name}` },
       shipping_address_collection: { allowed_countries: [...SHIPPING_COUNTRIES] },
       phone_number_collection: { enabled: true },
       custom_text: {
-        shipping_address: { message: `We'll print ${seats} NFC cards for your team and ship them here for free.` },
+        shipping_address: { message: `We'll print ${seats} smart cards for your team and ship them here for free.` },
         submit: {
           message: `Billed monthly: ${seats} cards × ${formatMoney(quote.unit)} = ${formatMoney(quote.total)}/month (${quote.percent}% team discount).`,
         },

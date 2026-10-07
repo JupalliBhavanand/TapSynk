@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { priceData } from "@/lib/billing";
+import { priceData, releaseSchedule, scheduleSwitchAtPeriodEnd } from "@/lib/billing";
 import { SITE_URL } from "@/lib/env";
 import { INTERVALS, PLANS, SHIPPING_COUNTRIES, TRIAL_DAYS } from "@/lib/plans";
 import { rateLimit } from "@/lib/rate-limit";
 import { stripe } from "@/lib/stripe";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
 import { isActive, type Subscription } from "@/lib/types";
 
@@ -23,23 +24,62 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle();
     const current = existing as Subscription | null;
 
-    // Plan change for an existing subscriber: swap the price in place with proration.
+    // Plan change for an existing subscriber. Customers can switch between Virtual and AI any time:
+    // - Virtual → AI (or a new billing period) starts now; the price difference is prorated and charged today.
+    // - AI → Virtual starts when the paid period ends, so they keep the AI they already paid for.
     if (isActive(current) && current?.stripe_subscription_id) {
-      if (current.tier === tier && current.billing_interval === interval) {
-        return NextResponse.json({ error: "You're already on this plan." }, { status: 400 });
-      }
+      const admin = createAdminClient();
+      const clearPending = () =>
+        admin.from("subscriptions").update({ pending_tier: null, pending_interval: null, pending_change_at: null, stripe_schedule_id: null }).eq("user_id", user.id);
       const sub = await stripe().subscriptions.retrieve(current.stripe_subscription_id);
-      await stripe().subscriptions.update(sub.id, {
+      const scheduleId = typeof sub.schedule === "string" ? sub.schedule : (sub.schedule?.id ?? null);
+
+      if (current.tier === tier && current.billing_interval === interval) {
+        // Picking the current plan again cancels a switch that hasn't happened yet.
+        if (!scheduleId && !current.pending_tier) return NextResponse.json({ error: "You're already on this plan." }, { status: 400 });
+        await releaseSchedule(scheduleId);
+        await clearPending();
+        return NextResponse.json({ url: `/dashboard/billing?kept=${tier}` });
+      }
+      if (current.pending_tier === tier && current.pending_interval === interval && scheduleId) {
+        return NextResponse.json({ error: "This switch is already scheduled." }, { status: 400 });
+      }
+
+      if (current.tier === "ai" && tier === "virtual" && sub.status !== "trialing") {
+        const { scheduleId: id, at } = await scheduleSwitchAtPeriodEnd(sub, tier, interval);
+        await admin
+          .from("subscriptions")
+          .update({ pending_tier: tier, pending_interval: interval, pending_change_at: at, stripe_schedule_id: id })
+          .eq("user_id", user.id);
+        return NextResponse.json({ url: `/dashboard/billing?scheduled=${tier}` });
+      }
+
+      await releaseSchedule(scheduleId);
+      // The new plan only applies once the prorated charge goes through.
+      // The free month is for the Virtual Card only, so moving to AI ends it and AI is charged from today.
+      const endTrial = tier === "ai" && sub.status === "trialing";
+      const updated = await stripe().subscriptions.update(sub.id, {
         items: [{ id: sub.items.data[0]!.id, price_data: await priceData(tier, interval) }],
         proration_behavior: "always_invoice",
-        metadata,
+        payment_behavior: "pending_if_incomplete",
+        ...(endTrial ? { trial_end: "now" as const } : {}),
       });
+      if (updated.pending_update) {
+        return NextResponse.json({ error: "Your card was declined, so your plan wasn't changed. Update your card under “Manage billing” and try again." }, { status: 402 });
+      }
+      await stripe().subscriptions.update(sub.id, { metadata });
+      // Unlock (or lock) AI features right away; the webhook confirms the same values.
+      await admin
+        .from("subscriptions")
+        .update({ tier, billing_interval: interval, pending_tier: null, pending_interval: null, pending_change_at: null, stripe_schedule_id: null, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
       return NextResponse.json({ url: `/dashboard/billing?changed=${tier}` });
     }
 
-    // First month free, once per account (never after a previous subscription).
+    // First month free on the Virtual Card only, once per account (never after a previous subscription).
+    // AI Card plans are charged from day one.
     const { data: profile } = await supabase.from("profiles").select("trial_used_at").eq("id", user.id).maybeSingle();
-    const trial = !current && !profile?.trial_used_at;
+    const trial = tier === "virtual" && !current && !profile?.trial_used_at;
     const price = `$${PLANS[tier].prices[interval]}${INTERVALS[interval].short}`;
 
     const session = await stripe().checkout.sessions.create({
@@ -50,14 +90,14 @@ export async function POST(request: NextRequest) {
       metadata,
       subscription_data: {
         metadata,
-        description: `TapSync ${PLANS[tier].name}`,
+        description: `TapSynk ${PLANS[tier].name}`,
         ...(trial ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } } } : {}),
       },
       payment_method_collection: "always",
       shipping_address_collection: { allowed_countries: [...SHIPPING_COUNTRIES] },
       phone_number_collection: { enabled: true },
       custom_text: {
-        shipping_address: { message: "We'll print your NFC card and ship it here for free." },
+        shipping_address: { message: "We'll print your smart card and ship it here for free." },
         submit: {
           message: trial
             ? `You pay $0 today. Your first ${TRIAL_DAYS} days are free, then ${price}. Cancel any time before then and you won't be charged. Your card ships within 3–5 business days.`
@@ -71,6 +111,9 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {
+    if ((e as { type?: string }).type === "StripeCardError") {
+      return NextResponse.json({ error: "Your card was declined, so your plan wasn't changed. Update your card under “Manage billing” and try again." }, { status: 402 });
+    }
     console.error("Checkout error", e);
     return NextResponse.json({ error: "Payments aren't available right now. Please try again." }, { status: 500 });
   }

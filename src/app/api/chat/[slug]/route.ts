@@ -1,21 +1,30 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { ApiError } from "@google/genai";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { chatHistorySchema, runAgent } from "@/lib/agent";
+import { chatHistorySchema, chatMessageSchema, runAgent } from "@/lib/agent";
 import { getPublicCard } from "@/lib/data";
-import { REQUIRE_SUBSCRIPTION } from "@/lib/env";
+import { AUDIO_TYPES, transcribe } from "@/lib/gemini";
 import { rateLimit } from "@/lib/rate-limit";
 import { parseSource } from "@/lib/source";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
-import { isActive } from "@/lib/types";
+import { hasAi } from "@/lib/types";
 import { clientIp } from "@/lib/utils";
+import { speakToken } from "@/lib/voice";
 
 export const maxDuration = 60;
 
+const requestSchema = z.object({
+  messages: z.array(chatMessageSchema).max(30),
+  // A spoken message: a short recording (about 30 seconds at most) that Gemini writes down in any language.
+  audio: z.object({ data: z.string().min(100).max(3_000_000), mimeType: z.enum(AUDIO_TYPES) }).optional(),
+  preview: z.boolean().optional(),
+  source: z.string().max(8).optional(),
+});
+
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[slug]">) {
   const { slug } = await ctx.params;
-  const body = z.object({ messages: chatHistorySchema, preview: z.boolean().optional(), source: z.string().max(8).optional() }).safeParse(await request.json().catch(() => null));
+  const body = requestSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Invalid message." }, { status: 400 });
 
   const found = await getPublicCard(slug);
@@ -28,8 +37,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
     const { user } = await getUser();
     isOwner = user?.id === card.user_id;
   }
-  const aiPlanActive = isActive(subscription) && subscription?.tier === "ai";
-  if (!isOwner && (!card.published || (REQUIRE_SUBSCRIPTION && !aiPlanActive))) {
+  // The AI is locked to AI plans, for visitors and for the owner's own test chat alike.
+  if (!hasAi(subscription)) {
+    return NextResponse.json({ error: isOwner ? "The AI agent is part of the AI Card plan. Switch plans to use it." : "This assistant isn't available." }, { status: isOwner ? 403 : 404 });
+  }
+  if (!isOwner && !card.published) {
     return NextResponse.json({ error: "This assistant isn't available." }, { status: 404 });
   }
 
@@ -37,23 +49,34 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
   const allowed = (await rateLimit(`chat:${ip}`, 30, 600)) && (await rateLimit(`chat-card:${card.id}`, 600, 3600));
   if (!allowed) return NextResponse.json({ error: "You're sending messages quickly. Please wait a moment." }, { status: 429 });
 
-  if (!isOwner && body.data.messages.length === 1) {
-    after(async () => {
-      await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "ai", p_source: parseSource(body.data.source) });
-    });
-  }
-
   try {
+    let transcript: string | undefined;
+    let history = body.data.messages;
+    if (body.data.audio) {
+      transcript = await transcribe(body.data.audio.data, body.data.audio.mimeType);
+      if (!transcript) return NextResponse.json({ transcript: "" });
+      history = [...history, { role: "user" as const, content: transcript.slice(0, 2000) }].slice(-30);
+      while (history[0]?.role === "assistant") history = history.slice(1);
+    }
+    const valid = chatHistorySchema.safeParse(history);
+    if (!valid.success) return NextResponse.json({ error: "Invalid message." }, { status: 400 });
+
+    if (!isOwner && valid.data.length === 1) {
+      after(async () => {
+        await createAdminClient().rpc("bump_card_stat", { p_slug: slug, p_kind: "ai", p_source: parseSource(body.data.source) });
+      });
+    }
+
     const result = await runAgent({
       card,
       agent,
-      history: body.data.messages,
+      history: valid.data,
       canBook: () => rateLimit(`book:${ip}:${card.id}`, 3, 86400),
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, transcript, speakToken: speakToken(slug, result.reply) });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return NextResponse.json({ error: "The assistant is busy. Please try again in a moment." }, { status: 503 });
-    if (e instanceof Anthropic.APIError) console.error("Claude API error", e.status, e.message);
+    if (e instanceof ApiError && e.status === 429) return NextResponse.json({ error: "The assistant is busy. Please try again in a moment." }, { status: 503 });
+    if (e instanceof ApiError) console.error("Gemini API error", e.status, e.message);
     else console.error("Chat error", e);
     return NextResponse.json({ error: "The assistant is unavailable right now." }, { status: 500 });
   }

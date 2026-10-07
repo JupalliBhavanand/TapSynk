@@ -31,7 +31,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/leads/[
     return NextResponse.json({ error: "This card isn't available." }, { status: 404 });
   }
   const ip = clientIp(request.headers);
-  if (!(await rateLimit(`lead:${ip}`, 5, 3600)) || !(await rateLimit(`lead-card:${found.card.id}`, 200, 86400))) {
+  // Per card per visitor, plus a looser per-network cap, so people on shared event Wi-Fi can still swap details with many cards.
+  const allowed =
+    (await rateLimit(`lead:${ip}:${found.card.id}`, 3, 3600)) && (await rateLimit(`lead:${ip}`, 30, 3600)) && (await rateLimit(`lead-card:${found.card.id}`, 200, 86400));
+  if (!allowed) {
     return NextResponse.json({ error: "You've already shared your details. Thanks!" }, { status: 429 });
   }
 

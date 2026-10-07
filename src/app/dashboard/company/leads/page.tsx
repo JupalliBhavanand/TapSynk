@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { Download } from "lucide-react";
 import { LeadList } from "@/components/LeadList";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import { isActive, type Lead } from "@/lib/types";
 
 export default async function CompanyLeadsPage() {
-  const { supabase, company } = (await getDashboardData())!;
+  const { supabase, company } = await requireDashboardData();
   if (!company || !isActive(company)) redirect("/dashboard/company");
   const [{ data }, { data: cards }] = await Promise.all([
-    supabase.from("leads").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(500),
+    supabase.from("leads").select("*").eq("company_id", company.id).order("created_at", { ascending: false }).limit(1000),
     supabase.from("cards").select("id, full_name").eq("company_id", company.id),
   ]);
   const leads = (data ?? []) as Lead[];

@@ -49,8 +49,8 @@ export function formatInZone(iso: string | Date, timeZone: string) {
   }).format(typeof iso === "string" ? new Date(iso) : iso);
 }
 
-/** Available start times (UTC ISO strings) on a local date, excluding past and booked slots. */
-export function availableSlots(agent: Agent, dateStr: string, bookedStarts: string[], now = new Date()) {
+/** Available start times (UTC ISO strings) on a local date, excluding past slots and any that overlap a booking. */
+export function availableSlots(agent: Agent, dateStr: string, booked: { starts_at: string; ends_at: string }[], now = new Date()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return [];
   const tz = isValidTimeZone(agent.timezone) ? agent.timezone : "UTC";
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -59,13 +59,14 @@ export function availableSlots(agent: Agent, dateStr: string, bookedStarts: stri
 
   const start = zonedToUtc(dateStr, agent.day_start.slice(0, 5), tz);
   const end = zonedToUtc(dateStr, agent.day_end.slice(0, 5), tz);
-  const booked = new Set(bookedStarts.map((s) => new Date(s).getTime()));
+  // Compare ranges, not just start times, so a change of meeting length can't double-book anyone.
+  const busy = booked.map((b) => [new Date(b.starts_at).getTime(), new Date(b.ends_at).getTime()] as const);
   const step = agent.slot_minutes * 60000;
   const earliest = now.getTime() + 60 * 60000; // at least one hour of notice
 
   const slots: string[] = [];
   for (let t = start.getTime(); t + step <= end.getTime(); t += step) {
-    if (t >= earliest && !booked.has(t)) slots.push(new Date(t).toISOString());
+    if (t >= earliest && !busy.some(([bs, be]) => t < be && t + step > bs)) slots.push(new Date(t).toISOString());
   }
   return slots;
 }

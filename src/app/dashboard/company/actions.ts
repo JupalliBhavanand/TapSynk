@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { COMPANY_MAX_SEATS, COMPANY_MIN_SEATS } from "@/lib/plans";
-import { agentSchema } from "@/lib/schemas";
+import { agentSchema, socialsSchema } from "@/lib/schemas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
-import { isActive, type Agent, type Card, type Company } from "@/lib/types";
+import { hasAi, isActive, type Agent, type Card, type Company } from "@/lib/types";
 import { safeUrl } from "@/lib/utils";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -62,7 +62,7 @@ export async function saveCompany(input: CompanyInput): Promise<Result<{ company
   if (company) {
     await admin
       .from("cards")
-      .update({ company: profile.name, website: profile.website, logo_url: profile.logo_url, accent: profile.accent, updated_at: now })
+      .update({ company: profile.name, website: profile.website, address: profile.address, logo_url: profile.logo_url, accent: profile.accent, updated_at: now })
       .eq("company_id", company.id);
   }
   revalidatePath("/dashboard", "layout");
@@ -87,10 +87,11 @@ const employeeSchema = z.object({
     .default(""),
   avatar_url: image,
   published: z.boolean().default(true),
+  socials: socialsSchema,
 });
 export type EmployeeInput = z.input<typeof employeeSchema>;
 
-const RESERVED = new Set(["admin", "api", "app", "dashboard", "login", "signup", "pricing", "support", "help", "tapsync", "www"]);
+const RESERVED = new Set(["admin", "api", "app", "dashboard", "login", "signup", "pricing", "support", "help", "tapsync", "tapsynk", "www"]);
 
 export async function saveEmployeeCard(id: string | null, input: EmployeeInput): Promise<Result<{ card: Card }>> {
   const { supabase, user, company } = await ownCompany();
@@ -139,6 +140,7 @@ export async function saveCompanyAgent(input: z.input<typeof agentSchema>): Prom
   const { supabase, user, company } = await ownCompany();
   if (!user) return { ok: false, error: "Please sign in again." };
   if (!company) return { ok: false, error: "Set up your company first." };
+  if (!hasAi(company)) return { ok: false, error: "The AI agent is part of AI Cards. Switch your team to AI Cards to use it." };
   const parsed = agentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your details." };
   if (parsed.data.day_start >= parsed.data.day_end) return { ok: false, error: "Your day must end after it starts." };

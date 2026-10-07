@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Bot, Check, Handshake, Loader2, Share2, UserPlus, X } from "lucide-react";
 import { ChatPanel } from "@/components/ChatWidget";
+import { AI_BUTTON, AI_BUTTON_SUB } from "@/lib/greeting";
+import { loadGreeting, unlockAudio } from "@/lib/speech";
 import type { EventSource } from "@/lib/types";
 
 export function CardActions({
@@ -10,15 +12,23 @@ export function CardActions({
   ai,
   businessName,
   ownerName,
+  intro,
+  booking,
+  logoUrl,
   source,
 }: {
   slug: string;
   ai: boolean;
   businessName: string;
   ownerName: string;
+  intro: string;
+  booking: boolean;
+  logoUrl?: string;
   source: EventSource;
 }) {
   const [open, setOpen] = useState<"chat" | "lead" | null>(null);
+  const [contactHelp, setContactHelp] = useState(false);
+  const contactUrl = `/api/vcard/${encodeURIComponent(slug)}.vcf?s=${source[0]}`;
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -33,17 +43,40 @@ export function CardActions({
     else await navigator.clipboard.writeText(url);
   }
 
+  // Get the AI's spoken greeting ready while the visitor looks at the card, so it plays the instant they tap.
+  useEffect(() => {
+    if (!ai) return;
+    const t = setTimeout(() => void loadGreeting(slug), 600);
+    return () => clearTimeout(t);
+  }, [ai, slug]);
+
   const first = ownerName.split(" ")[0] || ownerName;
+
+  function openChat() {
+    // Phones only allow sound that starts inside a tap, so unlock it here for the AI's greeting.
+    unlockAudio();
+    setOpen("chat");
+  }
 
   return (
     <>
-      <a href={`/api/vcard/${slug}?s=${source[0]}`} className="btn btn-dark w-full py-3.5 text-base">
+      <a href={contactUrl} onClick={() => setContactHelp(true)} className="btn btn-dark w-full py-3.5 text-base">
         <UserPlus className="h-5 w-5" /> Save contact
       </a>
+      {contactHelp && (
+        <div className="rounded-xl bg-bg p-3 text-sm text-ink-2" role="status">
+          <p>Confirm the import on your phone to finish saving. On iPhone, choose Create New Contact, then Done. On Android, open the downloaded .vcf file and choose your Contacts app.</p>
+          <p className="mt-2">If it does not open, use Safari or Chrome, or <a href={`${contactUrl}&download=1`} className="font-semibold text-brand underline">download the contact file</a> and open it.</p>
+        </div>
+      )}
       {ai && (
-        <button type="button" onClick={() => setOpen("chat")} className="btn btn-primary relative w-full overflow-hidden py-3.5 text-base">
+        <button type="button" onClick={openChat} className="btn btn-primary relative w-full overflow-hidden py-2.5 text-base">
           <span className="absolute inset-0 -translate-x-full animate-[shine_2.8s_ease_1s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-          <Bot className="h-5 w-5" /> Talk to AI
+          <Bot className="h-5 w-5 shrink-0" />
+          <span className="flex flex-col items-start leading-tight">
+            <span>{AI_BUTTON}</span>
+            <span className="text-xs font-medium text-white/80">{AI_BUTTON_SUB}</span>
+          </span>
         </button>
       )}
       <div className="grid grid-cols-2 gap-2.5">
@@ -59,7 +92,7 @@ export function CardActions({
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/40 backdrop-blur-sm sm:items-center sm:p-6" onClick={() => setOpen(null)}>
           {open === "chat" ? (
             <div className="sheet-up h-[88dvh] w-full max-w-md sm:h-[640px]" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Chat with ${businessName} AI`}>
-              <ChatPanel slug={slug} businessName={businessName} ownerName={ownerName} source={source} onClose={() => setOpen(null)} className="h-full rounded-t-[28px] shadow-2xl sm:rounded-[28px]" />
+              <ChatPanel slug={slug} businessName={businessName} ownerName={ownerName} intro={intro} booking={booking} logoUrl={logoUrl} source={source} onClose={() => setOpen(null)} className="h-full rounded-t-[28px] shadow-2xl sm:rounded-[28px]" />
             </div>
           ) : (
             <div className="sheet-up w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Share your contact with ${first}`}>

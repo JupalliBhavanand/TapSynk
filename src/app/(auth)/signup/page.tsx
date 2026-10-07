@@ -4,7 +4,7 @@ import { SignupForm } from "../AuthForms";
 
 export const metadata: Metadata = {
   title: "Create your account",
-  description: "Create your TapSync account and design your AI-powered NFC business card in minutes.",
+  description: "Create your TapSynk account and design your AI-powered smart business card in minutes.",
 };
 
 export default async function SignupPage({ searchParams }: PageProps<"/signup">) {

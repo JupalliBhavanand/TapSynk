@@ -9,20 +9,39 @@ import { cn } from "@/lib/utils";
 export function PricingTable({
   mode = "marketing",
   currentTier,
-  initialInterval = "year",
+  currentInterval,
+  periodEnd,
+  trialing = false,
+  initialInterval = "month",
   trial = true,
 }: {
   mode?: "marketing" | "dashboard";
   currentTier?: Tier | null;
+  currentInterval?: BillingInterval | null;
+  /** When the current paid period ends (AI → Virtual switches happen then). */
+  periodEnd?: string | null;
+  trialing?: boolean;
   initialInterval?: BillingInterval;
-  /** Whether this visitor still gets the free first month. */
+  /** Whether this visitor still gets the free first month (Virtual Card only). */
   trial?: boolean;
 }) {
   const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [loading, setLoading] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Fixed locale and zone so the server and browser render the same date (no hydration mismatch).
+  const endDate = periodEnd ? new Date(periodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+  const switchNote = (tier: Tier) => {
+    if (!currentTier || currentTier === tier) return null;
+    if (tier === "ai") return trialing ? "AI unlocks right away. Your free month ends and AI is charged from today." : "AI unlocks right away. You only pay the prorated difference today.";
+    return trialing ? "Switches right away. Still free until your first charge." : `You keep AI until ${endDate ?? "your plan renews"}, then switch to Virtual Card.`;
+  };
+
   async function checkout(tier: Tier) {
+    if (currentTier && currentTier !== tier) {
+      const note = switchNote(tier);
+      if (!confirm(`Switch to ${PLANS[tier].name} (${INTERVALS[interval].label.toLowerCase()})?\n\n${note}`)) return;
+    }
     setLoading(tier);
     setError(null);
     try {
@@ -67,8 +86,12 @@ export function PricingTable({
           const plan = PLANS[tier];
           const featured = tier === "ai";
           const save = savingsPercent(tier, interval);
-          const isCurrent = currentTier === tier;
+          const isCurrent = currentTier === tier && (!currentInterval || currentInterval === interval);
+          const isSwitch = Boolean(currentTier) && !isCurrent;
+          const note = switchNote(tier);
           const next = `/dashboard/billing?plan=${tier}&interval=${interval}`;
+          // The free month is for the Virtual Card only; AI Card plans are charged from day one.
+          const freeMonth = trial && tier === "virtual";
           return (
             <div
               key={tier}
@@ -90,7 +113,7 @@ export function PricingTable({
               <div className="relative">
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 <p className={cn("mt-1 text-sm", featured ? "text-white/70" : "text-muted")}>{plan.tagline}</p>
-                {trial && !isCurrent ? (
+                {freeMonth && !currentTier ? (
                   <>
                     <span className={cn("mt-6 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold", featured ? "bg-success/20 text-[#5ff0ae]" : "bg-success/10 text-success")}>
                       FIRST MONTH FREE
@@ -127,7 +150,7 @@ export function PricingTable({
               <div className="relative mt-8 pt-2">
                 {mode === "marketing" ? (
                   <Link href={`/signup?next=${encodeURIComponent(next)}`} className={cn("btn w-full", featured ? "btn-primary" : "btn-dark")}>
-                    {trial ? "Start free month" : `Get ${plan.name}`}
+                    {freeMonth ? "Start free month" : `Get ${plan.name}`}
                   </Link>
                 ) : (
                   <button
@@ -137,11 +160,21 @@ export function PricingTable({
                     className={cn("btn w-full", featured ? "btn-primary" : "btn-dark")}
                   >
                     {loading === tier && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {isCurrent ? "Your current plan" : loading === tier ? "Opening secure checkout…" : trial ? "Start my free month" : `Choose ${plan.name}`}
+                    {isCurrent
+                      ? "Your current plan"
+                      : loading === tier
+                        ? isSwitch ? "Switching…" : "Opening secure checkout…"
+                        : isSwitch
+                          ? currentTier === tier ? `Switch to ${INTERVALS[interval].label.toLowerCase()} billing` : tier === "ai" ? "Upgrade to AI Card" : "Switch to Virtual Card"
+                          : freeMonth ? "Start my free month" : `Choose ${plan.name}`}
                   </button>
                 )}
                 <p className={cn("mt-3 text-center text-xs", featured ? "text-white/50" : "text-muted")}>
-                  {trial && !isCurrent ? "$0 today · cancel any time in the first month · NFC card ships free" : "Physical NFC card + free shipping included"}
+                  {mode === "dashboard" && note
+                    ? note
+                    : freeMonth && !currentTier
+                      ? "$0 today · cancel any time in the first month · smart card ships free"
+                      : "Physical smart card + free shipping included · cancel any time"}
                 </p>
               </div>
             </div>

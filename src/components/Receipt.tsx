@@ -47,15 +47,15 @@ const Row = ({ label, value, className = "" }: { label: string; value: string; c
 export function Receipt({ data, stamped }: { data: ReceiptData; stamped: boolean }) {
   const money = (c: number) => formatMoney(c, data.currency);
   const date = new Date(data.date);
-  const longDate = date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }).toUpperCase();
-  const stampDate = date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  const longDate = date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).toUpperCase();
+  const stampDate = date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase();
 
   return (
     <div className="zigzag relative bg-white px-6 pb-10 pt-6 font-mono text-[11.5px] leading-relaxed text-ink shadow-[0_20px_40px_-24px_rgba(13,17,32,0.45)]">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[13px] font-bold tracking-[0.12em] text-brand">TAPSYNC</p>
-          <p className="tracking-[0.08em] text-muted">NFC CARD &amp; PLAN RECEIPT</p>
+          <p className="text-[13px] font-bold tracking-[0.12em] text-brand">TAPSYNK</p>
+          <p className="tracking-[0.08em] text-muted">SMART CARD &amp; PLAN RECEIPT</p>
         </div>
         <LogoMark className="h-9 w-9" />
       </div>
@@ -105,7 +105,7 @@ export function Receipt({ data, stamped }: { data: ReceiptData; stamped: boolean
       )}
 
       <p className="mx-auto mt-5 max-w-[16rem] text-center text-[10.5px] font-semibold tracking-[0.1em]">
-        THANK YOU FOR TAPPING INTO THE FUTURE WITH TAPSYNC!
+        THANK YOU FOR TAPPING INTO THE FUTURE WITH TAPSYNK!
       </p>
       <div className="mt-3">
         <Barcode value={data.receiptNumber} />

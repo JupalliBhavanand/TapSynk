@@ -9,17 +9,7 @@ export interface PhysicalCardData {
   ai?: boolean;
 }
 
-function NfcIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-      <path d="M6 8.5a5 5 0 0 1 0 7" />
-      <path d="M9.5 6a9 9 0 0 1 0 12" />
-      <path d="M13 3.5a13 13 0 0 1 0 17" />
-    </svg>
-  );
-}
-
-/** Front face of the NFC card (credit-card proportions). */
+/** Front face of the smart card (credit-card proportions). */
 export function PhysicalCard({ card, className = "" }: { card: PhysicalCardData; className?: string }) {
   return (
     <div
@@ -39,18 +29,16 @@ export function PhysicalCard({ card, className = "" }: { card: PhysicalCardData;
           )}
           <div className="flex items-center gap-1.5 text-white/80">
             {card.ai && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold tracking-wider">AI</span>}
-            <NfcIcon className="h-6 w-6" />
           </div>
         </div>
         <div>
-          <div className="mb-3 h-7 w-10 rounded-md bg-gradient-to-br from-[#f3d98b] via-[#d8b35c] to-[#a8823a] opacity-90" />
           <p className="truncate text-[clamp(15px,4.6cqw,22px)] font-bold leading-tight tracking-tight">{card.full_name || "Your Name"}</p>
           <p className="truncate text-[12px] text-white/70">
             {[card.job_title, card.company].filter(Boolean).join(" · ") || "Title · Company"}
           </p>
         </div>
       </div>
-      <span className="absolute bottom-[7%] right-[7%] font-mono text-[10px] tracking-[0.2em] text-white/50">TAPSYNC</span>
+      <span className="absolute bottom-[7%] right-[7%] font-mono text-[10px] tracking-[0.2em] text-white/50">TAPSYNK</span>
     </div>
   );
 }

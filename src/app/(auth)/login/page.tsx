@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <p className="mt-2 text-muted">Sign in to manage your card, AI agent and bookings.</p>
       <div className="mt-8"><LoginForm next={next} linkError={sp.error === "link"} /></div>
       <p className="mt-6 text-center text-sm text-muted">
-        New to TapSync? <Link href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand hover:underline">Create an account</Link>
+        New to TapSynk? <Link href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand hover:underline">Create an account</Link>
       </p>
     </div>
   );

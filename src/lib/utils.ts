@@ -41,3 +41,8 @@ export function safeUrl(raw: string): string {
 export function clientIp(headers: Headers) {
   return (headers.get("x-forwarded-for")?.split(",")[0] || headers.get("x-real-ip") || "unknown").trim();
 }
+
+/** "Oct 6, 2026": one readable format everywhere, the same on the server and in the browser. */
+export function formatDate(iso: string | Date) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}

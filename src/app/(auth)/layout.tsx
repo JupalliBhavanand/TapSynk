@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
       <div className="flex flex-col px-6 py-8 sm:px-12">
         <Logo />
         <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">{children}</main>
-        <p className="text-xs text-muted">© {new Date().getFullYear()} TapSync. Secured with encrypted sessions.</p>
+        <p className="text-xs text-muted">© {new Date().getFullYear()} TapSynk. Secured with encrypted sessions.</p>
       </div>
       <aside className="relative hidden overflow-hidden bg-navy lg:block">
         <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:24px_24px]" />

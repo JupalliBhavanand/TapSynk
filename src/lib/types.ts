@@ -1,13 +1,19 @@
 import type { BillingInterval, Tier } from "@/lib/plans";
 
-export interface Socials {
+export type Socials = {
   linkedin?: string;
   instagram?: string;
   x?: string;
   facebook?: string;
   youtube?: string;
   whatsapp?: string;
-}
+  tiktok?: string;
+  threads?: string;
+  telegram?: string;
+  github?: string;
+  pinterest?: string;
+  snapchat?: string;
+};
 
 export interface Card {
   id: string;
@@ -77,6 +83,11 @@ export interface Subscription {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   current_period_end: string | null;
+  /** A switch that takes effect when the current paid period ends (AI Card → Virtual Card). */
+  pending_tier?: Tier | null;
+  pending_interval?: BillingInterval | null;
+  pending_change_at?: string | null;
+  stripe_schedule_id?: string | null;
 }
 
 export interface ShippingAddress {
@@ -138,6 +149,24 @@ export interface Lead {
   company: string;
   message: string;
   status: "new" | "contacted" | "won" | "lost";
+  notes?: string;
+  created_at: string;
+}
+
+export interface DemoRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  role: string;
+  team_size: string;
+  interest: "virtual" | "ai" | "company" | "not_sure";
+  preferred_date: string | null;
+  preferred_time: "" | "morning" | "afternoon" | "evening";
+  timezone: string;
+  message: string;
+  status: "new" | "contacted" | "scheduled" | "done" | "not_a_fit";
   created_at: string;
 }
 
@@ -154,3 +183,6 @@ export interface CardEvent {
 export const ACTIVE_STATUSES = ["active", "trialing", "past_due"];
 export const isActive = (s: Pick<Subscription, "status"> | null | undefined) =>
   Boolean(s && ACTIVE_STATUSES.includes(s.status));
+
+/** The AI agent, "Talk to AI" and AI bookings are only for active AI plans (personal or company). */
+export const hasAi = (s: { status: string; tier: Tier } | null | undefined) => Boolean(s && isActive(s) && s.tier === "ai");

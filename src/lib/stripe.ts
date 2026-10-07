@@ -4,6 +4,6 @@ import { env } from "@/lib/env";
 
 let client: Stripe | null = null;
 export function stripe() {
-  client ??= new Stripe(env.stripeSecret(), { appInfo: { name: "TapSync" } });
+  client ??= new Stripe(env.stripeSecret(), { appInfo: { name: "TapSynk" } });
   return client;
 }

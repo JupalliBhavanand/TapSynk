@@ -10,17 +10,17 @@ export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect width="40" height="40" rx="11" fill="#0f1426" />
-      <path d="M12 13h16v4h-6v12h-4V17h-6z" fill="url(#lg)" />
-      <path d="M27 21a6 6 0 0 1 0 8M30 18.5a10 10 0 0 1 0 13" stroke="#8fb3ff" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      <path d="M8 11h15v4h-5v14h-5V15H8z" fill="url(#lg)" />
+      <path d="M23 18v11h4v-4l4 4h5l-7-7 6-6h-5l-3 3v-8h-4z" fill="#8fb3ff" />
     </svg>
   );
 }
 
 export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5 font-bold tracking-tight text-ink" aria-label="TapSync home">
+    <Link href={href} className="flex items-center gap-2.5 font-bold tracking-tight text-ink" aria-label="TapSynk home">
       <LogoMark />
-      <span className="text-lg">TapSync</span>
+      <span className="text-lg">TapSynk</span>
     </Link>
   );
 }

@@ -4,6 +4,7 @@ import { summarizeWebsite } from "@/lib/agent";
 import { rateLimit } from "@/lib/rate-limit";
 import { extractPage, safeFetchHtml } from "@/lib/safe-fetch";
 import { getUser } from "@/lib/supabase/server";
+import { hasAi } from "@/lib/types";
 import { safeUrl } from "@/lib/utils";
 
 export const maxDuration = 120;
@@ -25,12 +26,15 @@ export async function POST(request: NextRequest) {
   // Either the personal card's agent or the company-wide agent.
   let target: { card_id: string } | { company_id: string };
   if (body.data?.company) {
-    const { data: company } = await supabase.from("companies").select("id").eq("owner_id", user.id).maybeSingle();
+    const { data: company } = await supabase.from("companies").select("id, tier, status").eq("owner_id", user.id).maybeSingle();
     if (!company) return NextResponse.json({ error: "Set up your company first." }, { status: 400 });
+    if (!hasAi(company)) return NextResponse.json({ error: "The AI agent is part of AI Cards. Switch your team to AI Cards to use it." }, { status: 403 });
     target = { company_id: company.id };
   } else {
     const { data: card } = await supabase.from("cards").select("id").eq("user_id", user.id).is("company_id", null).maybeSingle();
     if (!card) return NextResponse.json({ error: "Create your card first." }, { status: 400 });
+    const { data: subscription } = await supabase.from("subscriptions").select("tier, status").eq("user_id", user.id).maybeSingle();
+    if (!hasAi(subscription)) return NextResponse.json({ error: "The AI agent is part of the AI Card plan. Switch plans to use it." }, { status: 403 });
     target = { card_id: card.id };
   }
 

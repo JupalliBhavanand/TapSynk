@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
@@ -30,6 +31,16 @@ export const getDashboardData = cache(async () => {
     trialAvailable: !profile?.trial_used_at && !subscription,
   };
 });
+
+/**
+ * For dashboard pages: the signed-in user's data, or a redirect to log in.
+ * Pages render alongside the layout, so each one must handle a signed-out visitor itself.
+ */
+export async function requireDashboardData() {
+  const data = await getDashboardData();
+  if (!data) redirect("/login?next=/dashboard");
+  return data;
+}
 
 /** Public card plus its owner's plan and agent (service role, server-only; agent config never reaches the browser). */
 export const getPublicCard = cache(async (slug: string) => {

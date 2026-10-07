@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-4 max-w-sm text-sm text-muted">
-            AI-powered NFC business cards. One tap shares your card, saves your contact, and lets an AI agent answer questions and book meetings for you.
+            AI-powered smart business cards. One tap shares your card, saves your contact, and lets an AI agent answer questions and book meetings for you.
           </p>
         </div>
         <div>
@@ -17,6 +17,7 @@ export function SiteFooter() {
             <li><Link href="/#how" className="hover:text-ink">How it works</Link></li>
             <li><Link href="/#ai" className="hover:text-ink">AI agent</Link></li>
             <li><Link href="/pricing" className="hover:text-ink">Pricing</Link></li>
+            <li><Link href="/demo" className="hover:text-ink">Book a demo</Link></li>
           </ul>
         </div>
         <div>
@@ -28,7 +29,7 @@ export function SiteFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-line py-6 text-center text-xs text-muted">© {new Date().getFullYear()} TapSync. All rights reserved.</div>
+      <div className="border-t border-line py-6 text-center text-xs text-muted">© {new Date().getFullYear()} TapSynk. All rights reserved.</div>
     </footer>
   );
 }

@@ -2,36 +2,40 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { ArrowRight, Bot, CalendarDays, CheckCircle2, Circle, Eye, Sparkles, UserPlus } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
+import { EmailSignature } from "@/components/EmailSignature";
+import { UpgradeToAiButton } from "@/components/UpgradeToAiButton";
 import { PhysicalCard } from "@/components/PhysicalCard";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
+import { formatDate } from "@/lib/utils";
 import { SITE_URL } from "@/lib/env";
 import { PLANS, INTERVALS } from "@/lib/plans";
 import { formatInZone } from "@/lib/slots";
-import { isActive, type Appointment } from "@/lib/types";
+import { hasAi, isActive, type Appointment } from "@/lib/types";
 
 export default async function DashboardHome() {
-  const data = (await getDashboardData())!;
+  const data = await requireDashboardData();
   const { card, subscription, agent, supabase, trialAvailable } = data;
   const active = isActive(subscription);
   const link = card ? `${SITE_URL}/c/${card.slug}` : "";
   const qr = card ? await QRCode.toDataURL(`${link}?s=q`, { margin: 1, width: 360, color: { dark: "#0f1426", light: "#ffffff" } }) : null;
 
-  const { data: upcoming } = card
+  const { data: upcoming, count: upcomingCount } = card
     ? await supabase
         .from("appointments")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("card_id", card.id)
         .eq("status", "confirmed")
         .gte("starts_at", new Date().toISOString())
         .order("starts_at")
         .limit(4)
-    : { data: [] };
+    : { data: [], count: 0 };
 
   const steps = [
     { done: Boolean(card), label: "Create your digital card", href: "/dashboard/card" },
     { done: Boolean(card?.published), label: "Publish & print your card", href: "/dashboard/card" },
-    { done: Boolean(agent && (agent.knowledge || agent.description)), label: "Train your AI agent", href: "/dashboard/ai" },
-    { done: active, label: trialAvailable ? "Start your free month & get your NFC card" : "Choose a plan & ship your NFC card", href: "/dashboard/billing" },
+    // Only AI plans can train the agent, so Virtual Card owners aren't left with a step they can't finish.
+    ...(hasAi(subscription) ? [{ done: Boolean(agent && (agent.knowledge || agent.description)), label: "Train your AI agent", href: "/dashboard/ai" }] : []),
+    { done: active, label: trialAvailable ? "Choose a plan (Virtual Card: first month free)" : "Choose a plan & ship your smart card", href: "/dashboard/billing" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -68,7 +72,7 @@ export default async function DashboardHome() {
           { label: "Card views", value: card?.views ?? 0, icon: Eye },
           { label: "Contacts saved", value: card?.saves ?? 0, icon: UserPlus },
           { label: "AI conversations", value: card?.ai_opens ?? 0, icon: Bot },
-          { label: "Upcoming bookings", value: upcoming?.length ?? 0, icon: CalendarDays },
+          { label: "Upcoming bookings", value: upcomingCount ?? upcoming?.length ?? 0, icon: CalendarDays },
         ].map((s) => (
           <div key={s.label} className="card-surface p-5">
             <div className="flex items-center justify-between text-muted">
@@ -119,23 +123,35 @@ export default async function DashboardHome() {
                 </p>
                 {subscription.current_period_end && (
                   <p className="text-sm text-muted">
-                    {subscription.status === "trialing" ? "Free month · first charge on" : "Renews"} {new Date(subscription.current_period_end).toLocaleDateString()}
+                    {subscription.status === "trialing" ? "Free month · first charge on" : "Renews"} {formatDate(subscription.current_period_end)}
+                  </p>
+                )}
+                {subscription.pending_tier && subscription.pending_change_at && (
+                  <p className="mt-1 text-sm text-muted">
+                    Switches to {PLANS[subscription.pending_tier].name} on {formatDate(subscription.pending_change_at)}
                   </p>
                 )}
                 {subscription.tier === "virtual" && (
-                  <Link href="/dashboard/billing" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
-                    <Sparkles className="h-4 w-4" /> Upgrade to the AI Card
-                  </Link>
+                  <div className="mt-4 rounded-xl bg-brand-soft/60 p-4">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="h-4 w-4 text-brand" /> Let an AI answer questions and book meetings from your card.</p>
+                    <div className="mt-3">
+                      {subscription.stripe_subscription_id ? (
+                        <UpgradeToAiButton interval={subscription.billing_interval} className="btn btn-primary py-2 text-sm" />
+                      ) : (
+                        <Link href="/dashboard/billing?plan=ai" className="btn btn-primary py-2 text-sm">Upgrade to the AI Card</Link>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
               <div className="mt-3">
                 <p className="text-sm text-muted">
                   {trialAvailable
-                    ? "Your first month is free. Pay $0 today, make your card live and get your NFC card shipped."
-                    : "Choose a plan to make your card live and get your NFC card shipped."}
+                    ? "Try the Virtual Card free for your first month. Pay $0 today, make your card live and get your smart card shipped."
+                    : "Choose a plan to make your card live and get your smart card shipped."}
                 </p>
-                <Link href="/dashboard/billing" className="btn btn-primary mt-4">{trialAvailable ? "Start free month" : "See plans"}</Link>
+                <Link href="/dashboard/billing" className="btn btn-primary mt-4">{trialAvailable ? "See plans · Virtual free for a month" : "See plans"}</Link>
               </div>
             )}
           </section>
@@ -159,6 +175,12 @@ export default async function DashboardHome() {
           </section>
         </div>
       </div>
+
+      {card && (
+        <div className="mt-6">
+          <EmailSignature card={card} link={link} />
+        </div>
+      )}
     </div>
   );
 }

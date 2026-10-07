@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TapSync — AI NFC Business Cards",
-    short_name: "TapSync",
+    name: "TapSynk — AI Smart Business Cards",
+    short_name: "TapSynk",
     description: "Tap to share your business card. Let AI sell and book for you.",
     start_url: "/dashboard",
     display: "standalone",

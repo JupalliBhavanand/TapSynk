@@ -9,13 +9,13 @@ const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["lati
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "TapSync — AI-powered NFC business cards",
-    template: "%s · TapSync",
+    default: "TapSynk — AI-powered smart business cards",
+    template: "%s · TapSynk",
   },
   description:
-    "Tap your NFC card on any phone to share your digital business card, let people save your contact in one tap, and have an AI marketing agent answer questions and book appointments for you.",
+    "Tap your smart card on any phone to share your digital business card, let people save your contact in one tap, and have an AI marketing agent answer questions and book appointments for you.",
   keywords: [
-    "NFC business card",
+    "TapSynk business card",
     "digital business card",
     "AI business card",
     "smart business card",
@@ -23,18 +23,18 @@ export const metadata: Metadata = {
     "contactless business card",
     "AI appointment booking",
   ],
-  applicationName: "TapSync",
+  applicationName: "TapSynk",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    siteName: "TapSync",
+    siteName: "TapSynk",
     url: SITE_URL,
-    title: "TapSync — AI-powered NFC business cards",
+    title: "TapSynk — AI-powered smart business cards",
     description: "One tap shares your card. An AI agent sells and books for you.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TapSync — AI-powered NFC business cards",
+    title: "TapSynk — AI-powered smart business cards",
     description: "One tap shares your card. An AI agent sells and books for you.",
   },
   robots: { index: true, follow: true },

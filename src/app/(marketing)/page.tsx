@@ -1,46 +1,38 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  Bot,
-  Building2,
-  CalendarCheck,
-  Gift,
-  Globe,
-  Handshake,
-  Lock,
-  Nfc,
-  QrCode,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-  UserPlus,
-  Zap,
-} from "lucide-react";
+import { ArrowRight, ArrowRightLeft, BarChart3, Bot, Building2, CalendarCheck, CalendarDays, Check, Gift, Globe, Handshake, Lock, Mic, Minus, MousePointer2, QrCode, ShieldCheck, Smartphone, Sparkles, UserPlus, Zap } from "lucide-react";
 import { CardPrinter } from "@/components/CardPrinter";
 import { HeroDemo } from "@/components/HeroDemo";
 import { CompanyPricing } from "@/components/CompanyPricing";
 import { PricingTable } from "@/components/PricingTable";
 import { Reveal } from "@/components/Reveal";
+import { UseCases } from "@/components/UseCases";
 import { SITE_URL } from "@/lib/env";
 import { PLANS } from "@/lib/plans";
 
 const faqs = [
   {
-    q: "Is the first month really free?",
-    a: "Yes. Individual Virtual and AI Card plans cost $0 for the first 30 days, and your NFC card still ships free. After that your plan's price starts automatically. Cancel any time in the first month and you won't be charged. One free month per account.",
+    q: "Is there a free trial?",
+    a: "Yes, on the Virtual Card. It costs $0 for the first 30 days and your smart card still ships free. After that the plan's price starts automatically, and you can cancel any time in the first month without being charged. The AI Card is billed from day one, and you can switch between the two whenever you like.",
   },
   {
     q: "Can I get cards for my whole team?",
     a: "Yes. The Company plan gives every employee a branded card, a team analytics dashboard and one monthly bill. It's priced per card with a team discount of 10% to 20% depending on team size. Company plans are billed monthly and don't include a free month.",
   },
   {
-    q: "Does the NFC card work with every phone?",
-    a: "Yes. Every modern iPhone (XR and newer) and almost every Android phone reads NFC without an app. For older phones there's a QR code on the back that opens the same card.",
+    q: "Can I switch between the Virtual Card and the AI Card?",
+    a: "Any time, from your dashboard. Upgrading to the AI Card unlocks your AI agent right away and you only pay the prorated difference. Moving back to the Virtual Card keeps your AI working until the end of the period you've already paid for.",
+  },
+  {
+    q: "Can I see a demo before I buy?",
+    a: "Yes. Book a free 15-minute demo and we'll show you the card, the AI agent and the dashboard set up around your own business.",
+  },
+  {
+    q: "Does the smart card work with every phone?",
+    a: "TapSynk works with compatible iPhones and Android phones without an app. You can also scan the QR code or open the card's link to see the same profile.",
   },
   {
     q: "How does the AI agent learn about my business?",
-    a: "Paste your website link and TapSync reads your pages and builds a knowledge base. You can also type in your services, prices and FAQs. The AI only answers from what you give it.",
+    a: "Paste your website link and TapSynk reads your pages and builds a knowledge base. You can also type in your services, prices and FAQs. The AI only answers from what you give it.",
   },
   {
     q: "Can visitors really book appointments through the AI?",
@@ -65,16 +57,16 @@ export default function HomePage() {
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      name: "TapSync",
+      name: "TapSynk",
       url: SITE_URL,
       logo: `${SITE_URL}/icon.svg`,
     },
     {
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "TapSync AI NFC Business Card",
-      description: "NFC business card with a digital profile, one-tap contact saving and an AI marketing agent that books appointments.",
-      brand: { "@type": "Brand", name: "TapSync" },
+      name: "TapSynk AI Smart Business Card",
+      description: "smart business card with a digital profile, one-tap contact saving and an AI marketing agent that books appointments.",
+      brand: { "@type": "Brand", name: "TapSynk" },
       offers: Object.values(PLANS).map((p) => ({
         "@type": "Offer",
         name: `${p.name} (monthly)`,
@@ -109,15 +101,15 @@ export default function HomePage() {
               <span className="text-gradient">Your AI sells for you.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-ink-2">
-              Tap your TapSync card on any phone to share your business card, save your contact in one tap, and let an AI marketing agent explain your
+              Tap your TapSynk card on any phone to share your business card, save your contact in one tap, and let an AI marketing agent explain your
               business, answer every question and book appointments, 24/7.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn btn-primary px-6 py-3.5 text-base">
                 Create your card free <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/pricing" className="btn btn-cream px-6 py-3.5 text-base">
-                See pricing
+              <Link href="/demo" className="btn btn-cream px-6 py-3.5 text-base">
+                <CalendarDays className="h-4 w-4" /> Book a free demo
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
@@ -141,7 +133,7 @@ export default function HomePage() {
             { icon: UserPlus, t: "Create your account", d: "Sign up and add your name, title, contact details and links." },
             { icon: Bot, t: "Train your AI", d: "Paste your website or type your services. Your agent learns it all." },
             { icon: Lock, t: "Choose a plan", d: "Pay securely with Stripe and enter where we ship your card." },
-            { icon: Nfc, t: "Tap & grow", d: "Tap any phone. People save you, chat with your AI and book." },
+            { icon: MousePointer2, t: "Tap & grow", d: "Tap any phone. People save you, chat with your AI and book." },
           ].map((s, i) => (
             <Reveal key={s.t} delay={i * 90}>
               <div className="card-surface h-full p-6">
@@ -164,11 +156,11 @@ export default function HomePage() {
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Your card, printed</p>
             <h2 className="mt-3 text-4xl font-bold tracking-tight">Watch your card come to life</h2>
             <p className="mt-4 text-lg text-ink-2">
-              The moment you publish, your card prints right on screen, and the same design is printed on a premium NFC card and shipped to your door.
+              The moment you publish, your card prints right on screen, and the same design is printed on a premium smart card and shipped to your door.
             </p>
             <ul className="mt-6 space-y-3 text-ink-2">
-              <li className="flex gap-3"><QrCode className="h-5 w-5 text-brand" /> NFC chip plus QR backup on every card</li>
-              <li className="flex gap-3"><Globe className="h-5 w-5 text-brand" /> Your own link: tapsync.app/c/your-name</li>
+              <li className="flex gap-3"><QrCode className="h-5 w-5 text-brand" /> Tap to connect, with QR backup on every card</li>
+              <li className="flex gap-3"><Globe className="h-5 w-5 text-brand" /> Your own shareable TapSynk profile link</li>
               <li className="flex gap-3"><Zap className="h-5 w-5 text-brand" /> Update details any time, no reprint needed</li>
             </ul>
           </Reveal>
@@ -191,12 +183,13 @@ export default function HomePage() {
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand-2">AI marketing agent</p>
             <h2 className="mt-3 text-4xl font-bold tracking-tight">A salesperson in every pocket you tap</h2>
             <p className="mt-4 text-lg text-white/70">
-              Every card gets a “Talk to AI” button. Your agent explains what you do, handles objections, answers pricing questions and books meetings, even
-              while you sleep.
+              Every AI Card gets an “Ask my AI anything” button. Your agent says hello out loud, explains what you do, answers questions by voice or chat in any
+              language, and books meetings, even while you sleep.
             </p>
           </Reveal>
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
+              { icon: Mic, t: "Talks and listens", d: "Visitors can speak to your AI and hear it answer, like a phone call. Typing works too." },
               { icon: Globe, t: "Learns from your website", d: "Paste a link. We read your pages and turn them into a knowledge base in seconds." },
               { icon: Bot, t: "Answers every question", d: "Services, pricing, hours, location: accurate answers grounded in your info only." },
               { icon: CalendarCheck, t: "Books appointments", d: "Offers real open slots in your timezone and confirms bookings instantly." },
@@ -218,14 +211,14 @@ export default function HomePage() {
         <Reveal className="max-w-2xl">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Grow from every tap</p>
           <h2 className="mt-3 text-4xl font-bold tracking-tight">Turn introductions into customers</h2>
-          <p className="mt-4 text-lg text-ink-2">TapSync doesn't just share your details. It brings people back to you and shows you what's working.</p>
+          <p className="mt-4 text-lg text-ink-2">TapSynk doesn't just share your details. It brings people back to you and shows you what's working.</p>
         </Reveal>
         <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: Handshake, t: "Lead capture", d: "Visitors tap “Share my contact” and their details land in your dashboard, ready to follow up or export to CSV." },
             { icon: BarChart3, t: "Real analytics", d: "Daily views, saves, leads, AI chats and bookings, plus whether people tapped your card, scanned the QR or opened a link." },
             { icon: Building2, t: "Company cards", d: "Branded cards for your whole team, a leaderboard of top performers and one monthly bill with a team discount." },
-            { icon: Gift, t: "First month free", d: "Try everything for 30 days for $0, with your physical card shipped free. Cancel any time." },
+            { icon: Gift, t: "Virtual Card free for a month", d: "Try the Virtual Card for 30 days for $0, with your physical card shipped free. Cancel any time." },
           ].map((f, i) => (
             <Reveal key={f.t} delay={i * 80}>
               <div className="card-surface h-full p-6">
@@ -238,17 +231,92 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ───── use cases ───── */}
+      <section id="use-cases" className="scroll-mt-16 bg-white py-24">
+        <div className="mx-auto max-w-6xl px-5">
+          <Reveal className="mx-auto mb-10 max-w-2xl text-center">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Built for your business</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight">One card, a hundred ways to win customers</h2>
+          </Reveal>
+          <UseCases />
+        </div>
+      </section>
+
+      {/* ───── paper vs TapSynk ───── */}
+      <section className="mx-auto max-w-4xl px-5 py-24">
+        <Reveal className="mb-10 text-center">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Why switch</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">Paper cards end the conversation. TapSynk keeps it going.</h2>
+        </Reveal>
+        <Reveal>
+          <div className="card-surface overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 border-b border-line bg-bg/60 px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted sm:gap-x-10 sm:px-8">
+              <span />
+              <span className="w-16 text-center sm:w-24">Paper</span>
+              <span className="w-16 text-center text-brand sm:w-24">TapSynk</span>
+            </div>
+            {[
+              "Saved to the phone in one tap",
+              "Update your details without reprinting",
+              "Know who viewed and saved your card",
+              "Collect the other person's contact back",
+              "Answers questions while you're busy",
+              "Books meetings for you, 24/7",
+            ].map((row) => (
+              <div key={row} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 border-b border-line px-5 py-3.5 text-sm last:border-0 sm:gap-x-10 sm:px-8">
+                <span className="font-medium text-ink-2">{row}</span>
+                <span className="grid w-16 place-items-center text-muted sm:w-24"><Minus className="h-4 w-4" aria-label="No" /></span>
+                <span className="grid w-16 place-items-center sm:w-24"><span className="grid h-6 w-6 place-items-center rounded-full bg-success/10 text-success"><Check className="h-3.5 w-3.5" aria-label="Yes" /></span></span>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+        <Reveal className="mt-8 grid gap-4 text-sm sm:grid-cols-3">
+          {[
+            { icon: Gift, t: "First month free", d: "$0 for 30 days on the Virtual Card." },
+            { icon: ArrowRightLeft, t: "Switch any time", d: "Move between Virtual and AI whenever you like." },
+            { icon: ShieldCheck, t: "Cancel any time", d: "No contracts. Your card ships free." },
+          ].map((p) => (
+            <div key={p.t} className="flex items-start gap-3 rounded-2xl border border-line bg-white p-4">
+              <p.icon className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+              <span>
+                <span className="block font-semibold">{p.t}</span>
+                <span className="block text-muted">{p.d}</span>
+              </span>
+            </div>
+          ))}
+        </Reveal>
+      </section>
+
       {/* ───── pricing ───── */}
       <section id="pricing" className="mx-auto max-w-6xl scroll-mt-16 px-5 py-24">
         <Reveal className="mb-10 text-center">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Pricing</p>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight">First month free. Card included.</h2>
-          <p className="mt-3 text-ink-2">Pay $0 for 30 days. Every plan ships a premium NFC card to your door for free.</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">Simple monthly plans. Card included.</h2>
+          <p className="mt-3 text-ink-2">Start the Virtual Card free for 30 days. Every plan ships a premium smart card to your door for free.</p>
         </Reveal>
         <PricingTable />
         <div className="mt-16">
           <CompanyPricing />
         </div>
+      </section>
+
+      {/* ───── book a demo ───── */}
+      <section className="mx-auto max-w-6xl px-5 pb-24">
+        <Reveal>
+          <div className="relative grid items-center gap-8 overflow-hidden rounded-[2rem] bg-navy px-8 py-12 text-white md:grid-cols-[1.4fr_1fr] md:px-12">
+            <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand/40 blur-3xl" />
+            <div className="relative">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand-2">Free 15-minute demo</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">See it working for your business before you buy</h2>
+              <p className="mt-3 max-w-lg text-white/70">We&apos;ll show you a live tap, your AI agent answering real questions and booking a meeting, and the dashboard where every lead lands.</p>
+            </div>
+            <div className="relative flex flex-col gap-3 md:items-end">
+              <Link href="/demo" className="btn btn-primary px-7 py-3.5 text-base"><CalendarDays className="h-4 w-4" /> Book a demo</Link>
+              <Link href="/demo?plan=company" className="text-sm font-semibold text-white/70 hover:text-white">Buying for a team? Book a company demo →</Link>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       {/* ───── FAQ ───── */}
@@ -274,7 +342,7 @@ export default function HomePage() {
         <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1d5bff] to-[#0f1426] px-8 py-16 text-center text-white">
           <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.4)_1px,transparent_1px)] [background-size:22px_22px]" />
           <h2 className="relative text-4xl font-bold tracking-tight">Make every introduction count</h2>
-          <p className="relative mx-auto mt-3 max-w-xl text-white/75">Design your card free, then go live with your first month on us.</p>
+          <p className="relative mx-auto mt-3 max-w-xl text-white/75">Design your card free, then go live. The Virtual Card's first month is on us.</p>
           <Link href="/signup" className="btn btn-cream relative mt-8 px-7 py-3.5 text-base">
             Create your card <ArrowRight className="h-4 w-4" />
           </Link>

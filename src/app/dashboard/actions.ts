@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
-import { agentSchema } from "@/lib/schemas";
-import type { Agent, Card } from "@/lib/types";
+import { agentSchema, socialsSchema } from "@/lib/schemas";
+import { hasAi, type Agent, type Card } from "@/lib/types";
 import { safeUrl } from "@/lib/utils";
 
 type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -45,22 +45,13 @@ const cardSchema = z.object({
   avatar_url: httpsImage,
   logo_url: httpsImage,
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563EB"),
-  socials: z
-    .object({
-      linkedin: url.optional(),
-      instagram: url.optional(),
-      x: url.optional(),
-      facebook: url.optional(),
-      youtube: url.optional(),
-      whatsapp: z.string().trim().max(30).regex(/^[+\d\s-]*$/).optional(),
-    })
-    .default({}),
+  socials: socialsSchema,
   published: z.boolean().default(false),
 });
 
 export type CardInput = z.input<typeof cardSchema>;
 
-const RESERVED = new Set(["admin", "api", "app", "dashboard", "login", "signup", "pricing", "support", "help", "tapsync", "www"]);
+const RESERVED = new Set(["admin", "api", "app", "dashboard", "login", "signup", "pricing", "support", "help", "tapsync", "tapsynk", "www"]);
 
 export async function saveCard(input: CardInput): Promise<Result<{ card: Card; firstPrint: boolean }>> {
   const { supabase, user } = await getUser();
@@ -100,8 +91,12 @@ export async function saveAgent(input: AgentInput): Promise<Result<{ agent: Agen
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your details." };
   if (parsed.data.day_start >= parsed.data.day_end) return { ok: false, error: "Your day must end after it starts." };
 
-  const { data: card } = await supabase.from("cards").select("id").eq("user_id", user.id).is("company_id", null).maybeSingle();
+  const [{ data: card }, { data: subscription }] = await Promise.all([
+    supabase.from("cards").select("id").eq("user_id", user.id).is("company_id", null).maybeSingle(),
+    supabase.from("subscriptions").select("tier, status").eq("user_id", user.id).maybeSingle(),
+  ]);
   if (!card) return { ok: false, error: "Create your card first." };
+  if (!hasAi(subscription)) return { ok: false, error: "The AI agent is part of the AI Card plan. Switch plans to use it." };
 
   const { data, error } = await supabase
     .from("ai_agents")
@@ -130,6 +125,22 @@ export async function setLeadStatus(id: string, status: "new" | "contacted" | "w
   if (!z.string().uuid().safeParse(id).success || !["new", "contacted", "won", "lost"].includes(status)) return { ok: false, error: "Unknown lead." };
   const { error } = await supabase.from("leads").update({ status }).eq("id", id).eq("owner_id", user.id);
   if (error) return { ok: false, error: "Could not update the lead." };
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/company/leads");
+  return { ok: true };
+}
+
+export async function setLeadNotes(id: string, notes: string): Promise<Result> {
+  const { supabase, user } = await getUser();
+  if (!user) return { ok: false, error: "Please sign in again." };
+  const parsed = z.object({ id: z.string().uuid(), notes: z.string().trim().max(2000) }).safeParse({ id, notes });
+  if (!parsed.success) return { ok: false, error: "Notes can be up to 2,000 characters." };
+  const { error } = await supabase
+    .from("leads")
+    .update({ notes: parsed.data.notes, updated_at: new Date().toISOString() })
+    .eq("id", parsed.data.id)
+    .eq("owner_id", user.id);
+  if (error) return { ok: false, error: "Could not save your note." };
   revalidatePath("/dashboard/leads");
   revalidatePath("/dashboard/company/leads");
   return { ok: true };

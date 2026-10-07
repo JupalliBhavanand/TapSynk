@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import { SITE_URL } from "@/lib/env";
 import { isActive } from "@/lib/types";
 import { EmployeeCardForm } from "../../EmployeeCardForm";
 
 export default async function NewEmployeeCardPage() {
-  const { company, user } = (await getDashboardData())!;
+  const { company, user } = await requireDashboardData();
   if (!company || !isActive(company)) redirect("/dashboard/company");
   return (
     <>

@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Bot, Loader2, UserPlus } from "lucide-react";
+import { AI_BUTTON } from "@/lib/greeting";
 import { ImageUpload } from "@/components/ImageUpload";
 import { PhysicalCard } from "@/components/PhysicalCard";
 import { ProfileCard } from "@/components/ProfileCard";
-import type { Card, Company } from "@/lib/types";
+import { SocialFields } from "@/components/SocialFields";
+import { hasAi, type Card, type Company, type Socials } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 import { saveEmployeeCard } from "./actions";
 
@@ -21,6 +23,7 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
     slug: initial?.slug ?? "",
     avatar_url: initial?.avatar_url ?? "",
     published: initial?.published ?? true,
+    socials: (initial?.socials ?? {}) as Socials,
   });
   const [slugTouched, setSlugTouched] = useState(Boolean(initial));
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +47,8 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
     });
   }
 
-  const preview = { ...form, company: company.name, website: company.website, address: company.address, logo_url: company.logo_url, accent: company.accent, socials: {} };
-  const ai = company.tier === "ai";
+  const preview = { ...form, company: company.name, website: company.website, address: company.address, logo_url: company.logo_url, accent: company.accent };
+  const ai = hasAi(company);
 
   return (
     <form onSubmit={submit} className="grid gap-8 xl:grid-cols-[1fr_400px]">
@@ -89,6 +92,13 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
             Card is live
           </label>
         </section>
+        <section className="card-surface p-6">
+          <h2 className="font-bold">Social links</h2>
+          <p className="text-sm text-muted">Optional. Paste a link or just an @handle; each shows on the card with its logo.</p>
+          <div className="mt-4">
+            <SocialFields idPrefix="e-social" value={form.socials} onChange={(k, v) => set("socials", { ...form.socials, [k]: v })} />
+          </div>
+        </section>
         <div className="flex items-center gap-4">
           <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />} {initial ? "Save card" : "Create card"}
@@ -102,7 +112,7 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
           actions={
             <>
               <span className="btn btn-dark w-full"><UserPlus className="h-4 w-4" /> Save contact</span>
-              {ai && <span className="btn btn-primary w-full"><Bot className="h-4 w-4" /> Talk to AI</span>}
+              {ai && <span className="btn btn-primary w-full"><Bot className="h-4 w-4" /> {AI_BUTTON}</span>}
             </>
           }
         />

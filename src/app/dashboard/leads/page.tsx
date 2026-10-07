@@ -1,11 +1,11 @@
 import { Download } from "lucide-react";
 import { LeadList } from "@/components/LeadList";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import type { Lead } from "@/lib/types";
 
 export default async function LeadsPage() {
-  const { supabase, user } = (await getDashboardData())!;
-  const { data } = await supabase.from("leads").select("*").eq("owner_id", user.id).is("company_id", null).order("created_at", { ascending: false }).limit(500);
+  const { supabase, user } = await requireDashboardData();
+  const { data } = await supabase.from("leads").select("*").eq("owner_id", user.id).is("company_id", null).order("created_at", { ascending: false }).limit(1000);
   const leads = (data ?? []) as Lead[];
 
   return (

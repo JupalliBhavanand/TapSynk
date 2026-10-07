@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { DailyViews, SourceSplit, StatTiles } from "@/components/Analytics";
 import { summarize, sinceIso } from "@/lib/analytics";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import type { CardEvent } from "@/lib/types";
 
 export default async function AnalyticsPage() {
-  const { supabase, card } = (await getDashboardData())!;
+  const { supabase, card } = await requireDashboardData();
   const { data } = card
     ? await supabase.from("card_events").select("kind, source, created_at").eq("card_id", card.id).gte("created_at", sinceIso()).limit(20000)
     : { data: [] };

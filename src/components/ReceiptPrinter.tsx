@@ -27,7 +27,7 @@ export function ReceiptPrinter({ data, autoStart = true }: { data: ReceiptData; 
 
   async function copy() {
     const lines = [
-      `TapSync receipt ${data.receiptNumber}`,
+      `TapSynk receipt ${data.receiptNumber}`,
       ...data.items.map((i) => `${i.label}: ${i.amount === null ? "Included" : formatMoney(i.amount, data.currency)}`),
       `Total paid: ${formatMoney(data.total, data.currency)}`,
       `Date: ${new Date(data.date).toLocaleDateString()}`,
@@ -44,7 +44,7 @@ export function ReceiptPrinter({ data, autoStart = true }: { data: ReceiptData; 
       ? "Print a fresh copy any time."
       : phase === "torn"
         ? "Ready to print a fresh copy anytime."
-        : "You're all set. Your NFC card is on its way.";
+        : "You're all set. Your smart card is on its way.";
 
   return (
     <div className="w-full">

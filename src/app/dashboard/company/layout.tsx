@@ -1,11 +1,11 @@
 import { Building2 } from "lucide-react";
-import { getDashboardData } from "@/lib/data";
+import { requireDashboardData } from "@/lib/data";
 import { PLANS } from "@/lib/plans";
 import { isActive } from "@/lib/types";
 import { CompanyTabs } from "./CompanyTabs";
 
 export default async function CompanyLayout({ children }: LayoutProps<"/dashboard/company">) {
-  const { company } = (await getDashboardData())!;
+  const { company } = await requireDashboardData();
   const active = isActive(company);
   return (
     <div className="fade-up mx-auto max-w-6xl">
