@@ -28,13 +28,31 @@ export function CardActions({
 }) {
   const [open, setOpen] = useState<"chat" | "lead" | null>(null);
   const [contactHelp, setContactHelp] = useState(false);
+  const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
   const contactUrl = `/api/vcard/${encodeURIComponent(slug)}.vcf?s=${source[0]}`;
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = open ? "hidden" : "";
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !window.visualViewport) return;
+    const visible = window.visualViewport;
+    const update = () => setViewport({ top: visible.offsetTop, height: visible.height });
+    update();
+    visible.addEventListener("resize", update);
+    visible.addEventListener("scroll", update);
+    return () => {
+      visible.removeEventListener("resize", update);
+      visible.removeEventListener("scroll", update);
+    };
   }, [open]);
 
   async function share() {
@@ -89,9 +107,9 @@ export function CardActions({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/40 backdrop-blur-sm sm:items-center sm:p-6" onClick={() => setOpen(null)}>
+        <div className="fixed inset-x-0 top-0 z-50 flex h-dvh items-end justify-center bg-navy/40 backdrop-blur-sm sm:items-center sm:p-6" style={viewport ? { top: viewport.top, height: viewport.height } : undefined} onClick={() => setOpen(null)}>
           {open === "chat" ? (
-            <div className="sheet-up h-[88dvh] w-full max-w-md sm:h-[640px]" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Chat with ${businessName} AI`}>
+            <div className="sheet-up h-[92%] min-h-0 w-full max-w-md sm:h-[640px] sm:max-h-full" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Chat with ${businessName} AI`}>
               <ChatPanel slug={slug} businessName={businessName} ownerName={ownerName} intro={intro} booking={booking} logoUrl={logoUrl} source={source} onClose={() => setOpen(null)} className="h-full rounded-t-[28px] shadow-2xl sm:rounded-[28px]" />
             </div>
           ) : (

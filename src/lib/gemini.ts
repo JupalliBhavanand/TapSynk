@@ -31,7 +31,7 @@ export async function transcribe(audioBase64: string, mimeType: string) {
         parts: [
           { inlineData: { mimeType, data: audioBase64 } },
           {
-            text: "Transcribe what the speaker says, word for word, in the language they speak (use that language's normal script). Output only the transcript. If there is no clear speech, output nothing.",
+            text: "Transcribe only clear foreground speech addressed to the microphone, word for word, in the language spoken (use its normal script). Ignore background conversations, television, music, fan noise and other ambient sounds. Do not invent speech from noise. Output only the transcript. If there is no clear foreground speech, output nothing.",
           },
         ],
       },

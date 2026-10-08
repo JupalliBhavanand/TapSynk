@@ -6,7 +6,7 @@ import { greetingFor } from "@/lib/greeting";
 import { loadGreeting, unlockAudio, useRecorder, useSpeaker, useSpeechSupport, type Greeting, type ListenError, type Recording } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 
-type Msg = { id: string; role: "user" | "assistant"; content: string; token?: string; pending?: boolean };
+type Msg = { id: string; role: "user" | "assistant"; content: string; token?: string; pending?: boolean; streaming?: boolean };
 type CallState = "listening" | "thinking" | "speaking" | "idle";
 
 const GREETING_ID = "greeting";
@@ -73,7 +73,7 @@ export function ChatPanel({
   const recorder = useRecorder();
   const { recording, level } = recorder;
 
-  const [greeting, setGreeting] = useState<Greeting | null>(null);
+  const [greeting, setGreeting] = useState<Greeting | null>(() => ({ text: greetingFor({ businessName, ownerName, intro, booking, voice: true }), audioUrl: null }));
   const [messages, setMessages] = useState<Msg[]>([]);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -88,10 +88,16 @@ export function ChatPanel({
   const [callError, setCallError] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Msg[]>([]);
   const callRef = useRef(false);
   const voiceOnRef = useRef(voiceOn);
   const busyRef = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    callRef.current = false;
+    requestRef.current?.abort();
+  }, []);
   const askRef = useRef<(q: { text?: string; audio?: Recording }) => Promise<void>>(async () => {});
   const fallbackGreeting = greetingFor({ businessName, ownerName, intro, booking, voice: true });
   const fallbackRef = useRef(fallbackGreeting);
@@ -103,28 +109,26 @@ export function ChatPanel({
 
   const scrollDown = useCallback(() => {
     // Do not return the browser's scroll result as an effect cleanup value.
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
   }, []);
   useEffect(scrollDown, [messages, busy, greeting, booked, scrollDown]);
 
   // The AI opens the conversation: it says hello out loud, in the visitor's language, the moment the chat opens.
   useEffect(() => {
     let live = true;
-    const started = Date.now();
-    const slow = new Promise<null>((r) => setTimeout(() => r(null), 3000));
+    let timeout: ReturnType<typeof setTimeout>;
+    const slow = new Promise<null>((r) => { timeout = setTimeout(() => r(null), 1000); });
     void Promise.race([loadGreeting(slug, preview), slow]).then((g) => {
-      // A short "typing" beat feels natural; a cached greeting is usually ready well before it ends.
-      setTimeout(() => {
-        if (!live) return;
+        if (!live || busyRef.current || messagesRef.current.length) return;
         const ready = g ?? { text: fallbackRef.current, audioUrl: null };
         setGreeting(ready);
-        setAnimatingId(GREETING_ID);
         // A dashboard preview opens without a tap, and browsers block sound until the visitor interacts.
         if (!preview && voiceOnRef.current) void speak(GREETING_ID, ready);
-      }, Math.max(0, 450 - (Date.now() - started)));
     });
     return () => {
       live = false;
+      clearTimeout(timeout);
     };
   }, [slug, preview, speak]);
 
@@ -156,7 +160,7 @@ export function ChatPanel({
     if ((!content && !audio) || busyRef.current) return;
     stopSpeaking();
     const userMsg: Msg = { id: uid(), role: "user", content, pending: Boolean(audio) };
-    const prior = messagesRef.current.filter((m) => !m.pending);
+    const prior = messagesRef.current.filter((m) => !m.pending && !m.streaming);
     // The API needs the conversation to start with the visitor, so drop any reply cut off by the 30-message window.
     const history = [...prior, ...(audio ? [] : [userMsg])].map(({ role, content }) => ({ role, content })).slice(audio ? -29 : -30);
     while (history[0]?.role === "assistant") history.shift();
@@ -166,14 +170,54 @@ export function ChatPanel({
     setBusy(true);
     busyRef.current = true;
     setError(null);
+    const replyId = uid();
+    const controller = new AbortController();
+    requestRef.current = controller;
     try {
       const res = await fetch(`/api/chat/${slug}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history, audio, preview, source }),
+        body: JSON.stringify({ messages: history, audio, preview, source, stream: true }),
+        signal: controller.signal,
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Something went wrong.");
+      if (!res.ok) {
+        const failure = await res.json().catch(() => ({}));
+        throw new Error(failure.error || "Something went wrong.");
+      }
+      let json: { reply?: string; transcript?: string; speakToken?: string; booked?: boolean };
+      if (res.headers.get("content-type")?.includes("application/x-ndjson") && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let complete: typeof json | undefined;
+        let streamed = "";
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            buffer += decoder.decode(value, { stream: !done });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const event = JSON.parse(line);
+              if (event.type === "error") throw new Error(event.error);
+              if (event.type === "transcript" && event.transcript) {
+                setMessages((m) => m.map((x) => x.id === userMsg.id ? { ...x, content: event.transcript, pending: false } : x));
+                setHeard(event.transcript);
+              }
+              if (event.type === "text") {
+                streamed = event.reset ? "" : streamed + event.text;
+                const content = streamed;
+                setMessages((m) => [...m.filter((x) => x.id !== replyId), ...(content ? [{ id: replyId, role: "assistant" as const, content, streaming: true }] : [])]);
+              }
+              if (event.type === "done") complete = event;
+            }
+            if (done) break;
+          }
+          if (!complete) throw new Error("The reply was interrupted. Please try again.");
+          json = complete;
+        } finally { reader.releaseLock(); }
+      } else json = await res.json();
       if (audio && !json.transcript) {
         setMessages((m) => m.filter((x) => x.id !== userMsg.id));
         if (callRef.current) {
@@ -183,27 +227,29 @@ export function ChatPanel({
         return;
       }
       if (audio) {
-        setMessages((m) => m.map((x) => (x.id === userMsg.id ? { ...x, content: json.transcript, pending: false } : x)));
-        setHeard(json.transcript);
+        const transcript = json.transcript ?? "";
+        setMessages((m) => m.map((x) => (x.id === userMsg.id ? { ...x, content: transcript, pending: false } : x)));
+        setHeard(transcript);
       }
       const reply = String(json.reply ?? "").trim() || "Sorry, I didn't quite get that. Could you say it another way?";
-      const id = uid();
+      const id = replyId;
       const speech = { text: reply, token: typeof json.speakToken === "string" ? json.speakToken : undefined };
-      setMessages((m) => [...m, { id, role: "assistant", content: reply, token: speech.token }]);
+      setMessages((m) => [...m.filter((x) => x.id !== replyId), { id, role: "assistant", content: reply, token: speech.token }]);
       setAnimatingId(id);
       if (json.booked) setBooked(true);
       if (callRef.current) {
         setLastReply(reply);
         setCallState("speaking");
         void speak(id, speech, () => {
-          if (callRef.current) listenInCall();
+          if (callRef.current) setCallState("idle");
         });
       } else if (voiceOnRef.current) {
         void speak(id, speech);
       }
     } catch (e) {
+      if (controller.signal.aborted) return;
       const message = e instanceof Error ? e.message : "Something went wrong.";
-      setMessages((m) => m.filter((x) => x.id !== userMsg.id));
+      setMessages((m) => m.filter((x) => x.id !== userMsg.id && x.id !== replyId));
       if (callRef.current) {
         setCallState("idle");
         setCallError(message);
@@ -212,6 +258,7 @@ export function ChatPanel({
         if (content) setInput(content);
       }
     } finally {
+      if (requestRef.current === controller) requestRef.current = null;
       setBusy(false);
       busyRef.current = false;
     }
@@ -232,6 +279,7 @@ export function ChatPanel({
   }
 
   function startCall() {
+    if (busyRef.current) return;
     unlockAudio();
     recorder.cancel();
     stopSpeaking();
@@ -276,8 +324,8 @@ export function ChatPanel({
   const status = recording ? "Listening…" : speakingId ? "Speaking…" : busy ? "Thinking…" : preview ? "Preview · only you can see this" : "Online · any language";
 
   return (
-    <div className={cn("relative flex flex-col overflow-hidden bg-white", className)}>
-      <header className="flex items-center gap-3 border-b border-line px-4 py-3.5">
+    <div className={cn("relative flex min-h-0 flex-col overflow-hidden bg-white", className)}>
+      <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3.5">
         <div className={cn("ai-avatar relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-2 to-brand text-white", speakingId && "is-speaking")}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -305,7 +353,7 @@ export function ChatPanel({
           {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
         {support.mic && (
-          <button type="button" onClick={startCall} className="grid h-9 w-9 place-items-center rounded-full bg-navy text-white transition hover:bg-brand" aria-label="Start a voice chat" title="Voice chat">
+          <button type="button" onClick={startCall} disabled={busy} className="grid h-9 w-9 place-items-center rounded-full bg-navy text-white transition hover:bg-brand disabled:opacity-50" aria-label="Start a voice chat" title="Voice chat">
             <AudioLines className="h-4 w-4" />
           </button>
         )}
@@ -316,7 +364,7 @@ export function ChatPanel({
         )}
       </header>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-bg/60 px-4 py-5" aria-live="polite">
+      <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-bg/60 px-4 py-5" aria-live="polite">
         {!greeting ? (
           <TypingDots />
         ) : (
@@ -340,7 +388,7 @@ export function ChatPanel({
             onProgress={scrollDown}
             onDone={() => setAnimatingId((id) => (id === m.id ? null : id))}
             speaking={speakingId === m.id}
-            onSpeak={m.role === "assistant" ? () => say(m.id, { text: m.content, token: m.token }) : undefined}
+            onSpeak={m.role === "assistant" && !m.streaming ? () => say(m.id, { text: m.content, token: m.token }) : undefined}
           />
         ))}
         {busy && <TypingDots />}
@@ -366,13 +414,13 @@ export function ChatPanel({
         <div ref={endRef} />
       </div>
 
-      {error && <p role="alert" className="border-t border-line bg-stamp/5 px-5 py-2 text-sm text-stamp">{error}</p>}
+      {error && <p role="alert" className="shrink-0 border-t border-line bg-stamp/5 px-5 py-2 text-sm text-stamp">{error}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void ask({ text: input });
         }}
-        className="flex items-end gap-2 border-t border-line p-3"
+        className="flex shrink-0 items-end gap-2 border-t border-line bg-white p-3"
       >
         {support.mic && (
           <button
@@ -398,7 +446,7 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void ask({ text: input });
               }
@@ -406,17 +454,17 @@ export function ChatPanel({
             rows={1}
             maxLength={2000}
             placeholder="Ask me anything…"
-            className="input max-h-32 min-h-[44px] flex-1 resize-none"
+            className="input max-h-32 min-h-[44px] min-w-0 flex-1 resize-none bg-white text-base text-ink placeholder:text-muted"
           />
         )}
         <button type="submit" disabled={busy || recording || !input.trim()} className="btn btn-primary h-11 w-11 shrink-0 p-0" aria-label="Send">
           <ArrowUp className="h-5 w-5" />
         </button>
       </form>
-      <p className="pb-2 text-center text-[10px] text-muted">AI answers may be imperfect. Powered by TapSynk.</p>
+      <p className="shrink-0 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-[10px] text-muted">AI answers may be imperfect. Powered by TapSynk.</p>
 
       {call && (
-        <div className="call-in absolute inset-0 z-20 flex flex-col items-center justify-between bg-[radial-gradient(120%_80%_at_50%_0%,#1d5bff_0%,#121a36_55%,#0b0f1d_100%)] px-6 pb-8 pt-10 text-white" role="dialog" aria-label="Voice chat">
+        <div className="call-in absolute inset-0 z-20 flex flex-col items-center justify-between overflow-y-auto bg-[radial-gradient(120%_80%_at_50%_0%,#1d5bff_0%,#121a36_55%,#0b0f1d_100%)] px-6 pb-8 pt-10 text-white" role="dialog" aria-label="Voice chat">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Voice chat · any language</p>
             <p className="mt-1 text-lg font-bold">{businessName} AI</p>
@@ -443,8 +491,8 @@ export function ChatPanel({
             </p>
           </div>
 
-          <button type="button" onClick={endCall} className="flex items-center gap-2 rounded-full bg-stamp px-6 py-3 font-semibold text-white shadow-lg transition hover:brightness-110">
-            <PhoneOff className="h-5 w-5" /> End voice chat
+          <button type="button" onClick={endCall} className="flex shrink-0 items-center gap-2 rounded-full bg-stamp px-6 py-3 font-semibold text-white shadow-lg transition hover:brightness-110">
+            <PhoneOff className="h-5 w-5" /> Back to typing
           </button>
         </div>
       )}
@@ -482,15 +530,12 @@ function VoiceBars({ className = "" }: { className?: string }) {
   );
 }
 
-const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-/** A chat bubble; new AI replies appear word by word, like they're being written. */
+/** A chat bubble; replies appear as soon as they arrive. */
 function Bubble({
   role,
   text,
   pending = false,
   animate,
-  onProgress,
   onDone,
   speaking,
   onSpeak,
@@ -505,32 +550,12 @@ function Bubble({
   speaking: boolean;
   onSpeak?: () => void;
 }) {
-  const words = text.split(/(\s+)/);
-  const [shown, setShown] = useState(animate && !reducedMotion() ? 0 : words.length);
-  const done = shown >= words.length;
-
+  // The server has already generated the answer; show it immediately.
   useEffect(() => {
     if (!animate) return;
-    if (reducedMotion()) {
-      const t = setTimeout(onDone, 0);
-      return () => clearTimeout(t);
-    }
-    let n = 0;
-    const timer = setInterval(() => {
-      n += 2; // a word and the space after it
-      setShown(n);
-      onProgress();
-      if (n >= words.length) {
-        clearInterval(timer);
-        onDone();
-      }
-    }, 38);
-    return () => clearInterval(timer);
-    // Runs once per bubble: the text of a message never changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animate]);
-
-  const visible = done ? text : words.slice(0, shown).join("");
+    const timer = setTimeout(onDone, 0);
+    return () => clearTimeout(timer);
+  }, [animate, onDone]);
 
   if (pending) {
     return (
@@ -551,10 +576,9 @@ function Bubble({
           speaking && "ring-2 ring-brand/30",
         )}
       >
-        {visible}
-        {!done && <span className="ml-0.5 inline-block h-4 w-0.5 translate-y-0.5 animate-pulse bg-brand" aria-hidden="true" />}
+        {text}
       </p>
-      {onSpeak && done && (
+      {onSpeak && (
         <button type="button" onClick={onSpeak} className="mt-1 flex items-center gap-1 px-1 text-xs font-medium text-muted transition hover:text-brand">
           {speaking ? <Square className="h-3 w-3 fill-current" /> : <Volume2 className="h-3.5 w-3.5" />}
           {speaking ? "Stop" : "Listen"}

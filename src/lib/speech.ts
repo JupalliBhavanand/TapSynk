@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { VoiceActivity } from "@/lib/voice-activity";
 
 /*
  * Voice for the AI chat.
@@ -72,12 +73,14 @@ export function useSpeaker(slug: string) {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const run = useRef(0);
   const urls = useRef(new Map<string, string>());
+  const pending = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const runs = run;
     const made = urls.current;
     return () => {
       runs.current++;
+      pending.current?.abort();
       player?.pause();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       made.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
@@ -86,6 +89,7 @@ export function useSpeaker(slug: string) {
 
   const stop = useCallback(() => {
     run.current++;
+    pending.current?.abort();
     player?.pause();
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeakingId(null);
@@ -95,6 +99,7 @@ export function useSpeaker(slug: string) {
   const speak = useCallback(
     async (id: string, speech: Speech, onDone?: () => void) => {
       const me = ++run.current;
+      pending.current?.abort();
       player?.pause();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       setSpeakingId(id);
@@ -108,17 +113,25 @@ export function useSpeaker(slug: string) {
 
       let url = speech.audioUrl || urls.current.get(id);
       if (!url && speech.token) {
+        const controller = new AbortController();
+        pending.current = controller;
+        // Do not leave a phone waiting indefinitely for a separate TTS request.
+        const timeout = setTimeout(() => controller.abort(), 1800);
         try {
           const res = await fetch(`/api/chat/${slug}/speak`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ text: speech.text, token: speech.token }),
+            signal: controller.signal,
           });
           if (res.ok) {
             url = URL.createObjectURL(await res.blob());
             urls.current.set(id, url);
           }
-        } catch {}
+        } catch {} finally {
+          clearTimeout(timeout);
+          if (pending.current === controller) pending.current = null;
+        }
       }
       if (run.current !== me) return;
       if (!url) return browserSpeak(speech.text, () => run.current === me, finish);
@@ -228,7 +241,7 @@ export type ListenError = "denied" | "unavailable";
 
 const TARGET_RATE = 16000;
 const MAX_MS = 30000;
-const PAUSE_MS = 1300;
+const PAUSE_MS = 650;
 const NO_SPEECH_MS = 8000;
 
 /** Records one spoken message. It stops by itself when the visitor pauses, or when `stop()` is called. */
@@ -248,16 +261,22 @@ export function useRecorder() {
     if (!ac || !navigator.mediaDevices?.getUserMedia) return handlers.onError?.("unavailable");
     // Resume inside the tap, before any await, or phones keep the audio engine paused.
     const resumed = ac.resume().catch(() => {});
-    const session: { finish: (send: boolean) => void } = { finish: () => {} };
+    const session: { finish: (send: boolean) => void } = { finish: () => {
+      if (active.current === session) {
+        active.current = null;
+        setRecording(false);
+      }
+    } };
     active.current = session;
     setRecording(true);
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 } });
       await resumed;
     } catch (e) {
-      if (active.current === session) active.current = null;
+      if (active.current !== session) return;
+      active.current = null;
       setRecording(false);
       const denied = e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
       return handlers.onError?.(denied ? "denied" : "unavailable");
@@ -268,12 +287,16 @@ export function useRecorder() {
     }
 
     const source = ac.createMediaStreamSource(stream);
-    const processor = ac.createScriptProcessor(4096, 1, 1);
+    const highpass = ac.createBiquadFilter();
+    highpass.type = "highpass";
+    highpass.frequency.value = 120;
+    const lowpass = ac.createBiquadFilter();
+    lowpass.type = "lowpass";
+    lowpass.frequency.value = 3800;
+    const processor = ac.createScriptProcessor(1024, 1, 1);
     const chunks: Float32Array[] = [];
     const started = performance.now();
-    let lastVoice = 0;
-    let heard = false;
-    let floor = 0.006;
+    const activity = new VoiceActivity();
     let done = false;
 
     session.finish = (send: boolean) => {
@@ -282,17 +305,21 @@ export function useRecorder() {
       processor.onaudioprocess = null;
       try {
         source.disconnect();
+        highpass.disconnect();
+        lowpass.disconnect();
         processor.disconnect();
       } catch {}
       stream.getTracks().forEach((t) => t.stop());
       if (active.current === session) active.current = null;
       setRecording(false);
       setLevel(0);
-      const longEnough = performance.now() - started > 500;
-      // A tap on "done" sends what was said even if it was quiet; an automatic stop needs heard speech.
-      if (!send || !(heard || longEnough) || !chunks.length) return handlers.onDone(null);
+      // Neither a manual stop nor a timeout may submit a noise-only clip.
+      if (!send) return;
+      if (!activity.heard || !chunks.length) return handlers.onDone(null);
       const samples = merge(chunks);
-      handlers.onDone({ data: toBase64(encodeWav(downsample(samples, ac.sampleRate, TARGET_RATE), TARGET_RATE)), mimeType: "audio/wav" });
+      const from = Math.max(0, Math.floor(((activity.firstVoiceMs ?? 0) - 180) * ac.sampleRate / 1000));
+      const to = Math.min(samples.length, Math.ceil((activity.lastVoiceMs + 200) * ac.sampleRate / 1000));
+      handlers.onDone({ data: toBase64(encodeWav(downsample(samples.subarray(from, to), ac.sampleRate, TARGET_RATE), TARGET_RATE)), mimeType: "audio/wav" });
     };
 
     processor.onaudioprocess = (e) => {
@@ -302,19 +329,15 @@ export function useRecorder() {
       for (let i = 0; i < input.length; i++) sum += input[i]! * input[i]!;
       const rms = Math.sqrt(sum / input.length);
       const now = performance.now();
-      const threshold = Math.max(0.015, floor * 3);
-      if (rms > threshold) {
-        heard = true;
-        lastVoice = now;
-      } else {
-        floor = floor * 0.95 + rms * 0.05;
-      }
-      setLevel(Math.min(1, rms * 9));
       const elapsed = now - started;
-      if ((heard && now - lastVoice > PAUSE_MS) || elapsed > MAX_MS) session.finish(true);
-      else if (!heard && elapsed > NO_SPEECH_MS) session.finish(false);
+      const voiced = activity.update(rms, elapsed, input.length / ac.sampleRate * 1000);
+      setLevel(voiced ? Math.min(1, rms * 9) : 0);
+      if ((activity.heard && elapsed - activity.lastVoiceMs > PAUSE_MS) || elapsed > MAX_MS) session.finish(true);
+      else if (!activity.heard && elapsed > NO_SPEECH_MS) session.finish(true);
     };
-    source.connect(processor);
+    source.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(processor);
     processor.connect(ac.destination);
   }, []);
 

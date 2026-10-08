@@ -1,5 +1,5 @@
 import "server-only";
-import type { Content, FunctionDeclaration } from "@google/genai";
+import { GenerateContentResponse, type Content, type FunctionDeclaration, type GenerateContentParameters, type Part } from "@google/genai";
 import { z } from "zod";
 import { gemini, GEMINI_MODEL, LOW_THINKING } from "@/lib/gemini";
 import { availableSlots, formatInZone, isValidTimeZone } from "@/lib/slots";
@@ -143,11 +143,31 @@ async function runTool(name: string, input: unknown, card: Card, agent: Agent, t
   return { error: `Unknown tool ${name}` };
 }
 
+async function streamedResponse(params: GenerateContentParameters, onText: (text: string, reset?: boolean) => void) {
+  onText("", true);
+  const stream = await gemini().models.generateContentStream(params);
+  const response = new GenerateContentResponse();
+  const parts: Part[] = [];
+  for await (const chunk of stream) {
+    if (chunk.promptFeedback) response.promptFeedback = chunk.promptFeedback;
+    const candidate = chunk.candidates?.[0];
+    if (!candidate) continue;
+    const incoming = candidate.content?.parts ?? [];
+    parts.push(...incoming);
+    response.candidates = [{ ...candidate, content: { role: "model", parts } }];
+    const text = incoming.filter((part) => !part.thought && part.text).map((part) => part.text).join("");
+    if (text) onText(text);
+  }
+  return response;
+}
+
 export async function runAgent(opts: {
   card: Card;
   agent: Agent;
   history: z.infer<typeof chatHistorySchema>;
   canBook: () => Promise<boolean>;
+  onText?: (text: string, reset?: boolean) => void;
+  signal?: AbortSignal;
 }): Promise<{ reply: string; booked: boolean }> {
   const { card, agent } = opts;
   const tz = isValidTimeZone(agent.timezone) ? agent.timezone : "UTC";
@@ -156,16 +176,19 @@ export async function runAgent(opts: {
   let booked = false;
 
   for (let turn = 0; turn < 6; turn++) {
-    const response = await gemini().models.generateContent({
+    opts.signal?.throwIfAborted();
+    const params: GenerateContentParameters = {
       model: GEMINI_MODEL,
       contents,
       config: {
         ...LOW_THINKING,
+        abortSignal: opts.signal,
         systemInstruction,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 768,
         ...(agent.booking_enabled ? { tools: [{ functionDeclarations: TOOLS }] } : {}),
       },
-    });
+    };
+    const response = opts.onText ? await streamedResponse(params, opts.onText) : await gemini().models.generateContent(params);
 
     const candidate = response.candidates?.[0];
     if (!candidate || response.promptFeedback?.blockReason || candidate.finishReason === "SAFETY") {

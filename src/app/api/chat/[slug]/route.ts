@@ -20,6 +20,7 @@ const requestSchema = z.object({
   audio: z.object({ data: z.string().min(100).max(3_000_000), mimeType: z.enum(AUDIO_TYPES) }).optional(),
   preview: z.boolean().optional(),
   source: z.string().max(8).optional(),
+  stream: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[slug]">) {
@@ -46,8 +47,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
   }
 
   const ip = clientIp(request.headers);
-  const allowed = (await rateLimit(`chat:${ip}`, 30, 600)) && (await rateLimit(`chat-card:${card.id}`, 600, 3600));
-  if (!allowed) return NextResponse.json({ error: "You're sending messages quickly. Please wait a moment." }, { status: 429 });
+  const limits = await Promise.all([rateLimit(`chat:${ip}`, 30, 600), rateLimit(`chat-card:${card.id}`, 600, 3600)]);
+  if (!limits.every(Boolean)) return NextResponse.json({ error: "You're sending messages quickly. Please wait a moment." }, { status: 429 });
 
   try {
     let transcript: string | undefined;
@@ -67,12 +68,35 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
       });
     }
 
-    const result = await runAgent({
+    const agentOptions = {
       card,
       agent,
       history: valid.data,
       canBook: () => rateLimit(`book:${ip}:${card.id}`, 3, 86400),
-    });
+    };
+    if (body.data.stream) {
+      const generation = new AbortController();
+      const encoder = new TextEncoder();
+      let canceled = false;
+      const stream = new ReadableStream({
+        start(controller) {
+          const emit = (event: object) => {
+            if (!canceled) controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+          };
+          emit({ type: "transcript", transcript });
+          void runAgent({ ...agentOptions, signal: generation.signal, onText: (text, reset) => emit({ type: "text", text, reset: Boolean(reset) }) })
+            .then((result) => emit({ type: "done", ...result, transcript, speakToken: speakToken(slug, result.reply) }))
+            .catch((e: unknown) => {
+              console.error("Streaming chat error", e);
+              emit({ type: "error", error: "The assistant is unavailable right now. Please try again." });
+            })
+            .finally(() => { if (!canceled) controller.close(); });
+        },
+        cancel() { canceled = true; generation.abort(); },
+      });
+      return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } });
+    }
+    const result = await runAgent(agentOptions);
     return NextResponse.json({ ...result, transcript, speakToken: speakToken(slug, result.reply) });
   } catch (e) {
     if (e instanceof ApiError && e.status === 429) return NextResponse.json({ error: "The assistant is busy. Please try again in a moment." }, { status: 503 });
