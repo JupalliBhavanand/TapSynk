@@ -11,7 +11,9 @@ export async function ensureProduct(tier: Tier, company = false) {
   let product: Stripe.Product;
   try {
     product = await stripe().products.retrieve(id);
-  } catch {
+  } catch (error) {
+    // Only create a missing product; authentication/network failures need their original diagnosis.
+    if ((error as { code?: string }).code !== "resource_missing") throw error;
     try {
       await stripe().products.create({
         id,

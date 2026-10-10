@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { checkoutFailure } from "@/lib/checkout-error";
 import { z } from "zod";
 import { priceData, releaseSchedule, scheduleSwitchAtPeriodEnd } from "@/lib/billing";
 import { SITE_URL } from "@/lib/env";
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
     const price = `$${PLANS[tier].prices[interval]}${INTERVALS[interval].short}`;
 
     const session = await stripe().checkout.sessions.create({
+      // TapSynk uses standard Checkout with custom copy and physical card shipping.
+      managed_payments: { enabled: false },
       mode: "subscription",
       line_items: [{ price_data: await priceData(tier, interval), quantity: 1 }],
       ...(current?.stripe_customer_id ? { customer: current.stripe_customer_id } : { customer_email: user.email }),
@@ -114,7 +117,8 @@ export async function POST(request: NextRequest) {
     if ((e as { type?: string }).type === "StripeCardError") {
       return NextResponse.json({ error: "Your card was declined, so your plan wasn't changed. Update your card under “Manage billing” and try again." }, { status: 402 });
     }
-    console.error("Checkout error", e);
-    return NextResponse.json({ error: "Payments aren't available right now. Please try again." }, { status: 500 });
+    const failure = checkoutFailure(e);
+    console.error("Checkout error", failure.diagnostics);
+    return NextResponse.json({ error: failure.message }, { status: 500 });
   }
 }

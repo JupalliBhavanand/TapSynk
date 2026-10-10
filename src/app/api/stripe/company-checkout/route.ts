@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { checkoutFailure } from "@/lib/checkout-error";
 import { z } from "zod";
 import { companyPriceData } from "@/lib/billing";
 import { SITE_URL } from "@/lib/env";
@@ -51,6 +52,8 @@ export async function POST(request: NextRequest) {
 
     await createAdminClient().from("companies").update({ tier, seats, updated_at: new Date().toISOString() }).eq("id", company.id);
     const session = await stripe().checkout.sessions.create({
+      // Account-level Managed Payments defaults reject our custom checkout copy.
+      managed_payments: { enabled: false },
       mode: "subscription",
       line_items: [{ price_data: await companyPriceData(tier, seats), quantity: seats }],
       ...(company.stripe_customer_id ? { customer: company.stripe_customer_id } : { customer_email: user.email }),
@@ -73,7 +76,8 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {
-    console.error("Company checkout error", e);
-    return NextResponse.json({ error: "Payments aren't available right now. Please try again." }, { status: 500 });
+    const failure = checkoutFailure(e);
+    console.error("Company checkout error", failure.diagnostics);
+    return NextResponse.json({ error: failure.message }, { status: 500 });
   }
 }
