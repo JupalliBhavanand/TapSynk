@@ -1,0 +1,16 @@
+[
+  {
+    "model": "gemini-3.8-flash-tts",
+    "ok": true,
+    "firstAudioMs": 1485,
+    "completeAudioMs": 2273,
+    "audioBytes": 115200
+  },
+  {
+    "model": "gemini-3.8-flash-lite-tts",
+    "ok": true,
+    "firstAudioMs": 1226,
+    "completeAudioMs": 1876,
+    "audioBytes": 120960
+  }
+]

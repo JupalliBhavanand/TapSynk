@@ -26,3 +26,10 @@ export function baseLanguage(lang: string | null | undefined) {
   const base = (lang ?? "").trim().toLowerCase().split(/[-_]/)[0] ?? "";
   return /^[a-z]{2,3}$/.test(base) ? base : "en";
 }
+
+/** Preserve regional pronunciation hints such as pt-BR, en-IN and zh-TW. */
+export function speechLanguage(lang: string | null | undefined) {
+  const value = (lang ?? "en").trim().replace(/_/g, "-");
+  if (value.length > 35 || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(value)) return "en";
+  try { return Intl.getCanonicalLocales(value)[0] ?? "en"; } catch { return "en"; }
+}

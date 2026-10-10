@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { businessIdentity } from "@/lib/business-identity";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { LogoMark } from "@/components/Logo";
@@ -48,7 +49,7 @@ export default async function PublicCardPage({ params, searchParams }: Props) {
   if (!live && !isOwner) notFound();
 
   const aiEnabled = Boolean(agent) && hasAi(subscription);
-  const businessName = agent?.business_name || card.company || card.full_name;
+  const businessName = businessIdentity(agent?.business_name, card.company, card.full_name, agent?.knowledge);
 
   if (live && !isOwner) {
     after(async () => {

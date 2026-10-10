@@ -475,8 +475,9 @@ body {
   position: relative;
   display: grid;
   place-items: center;
-  width: 168px;
-  height: 168px;
+  width: clamp(120px, 28vw, 168px);
+  height: clamp(120px, 28vw, 168px);
+  flex-shrink: 0;
   border-radius: 9999px;
 }
 .voice-orb::before,

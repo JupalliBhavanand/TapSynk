@@ -150,7 +150,7 @@ export default function HomePage() {
       </section>
 
       {/* ───── print demo ───── */}
-      <section className="bg-white py-24">
+      <section className="overflow-hidden bg-white py-24">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 lg:grid-cols-2">
           <Reveal>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand">Your card, printed</p>

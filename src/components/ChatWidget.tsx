@@ -6,7 +6,7 @@ import { greetingFor } from "@/lib/greeting";
 import { loadGreeting, unlockAudio, useRecorder, useSpeaker, useSpeechSupport, type Greeting, type ListenError, type Recording } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 
-type Msg = { id: string; role: "user" | "assistant"; content: string; token?: string; pending?: boolean; streaming?: boolean };
+type Msg = { id: string; role: "user" | "assistant"; content: string; token?: string; language?: string; pending?: boolean; streaming?: boolean };
 type CallState = "listening" | "thinking" | "speaking" | "idle";
 
 const GREETING_ID = "greeting";
@@ -69,7 +69,7 @@ export function ChatPanel({
 }) {
   const support = useSpeechSupport();
   const voiceOn = useSyncExternalStore(voicePref.subscribe, voicePref.get, () => true);
-  const { speak, stop: stopSpeaking, speakingId } = useSpeaker(slug);
+  const { speak, stop: stopSpeaking, speakingId, preparing, voiceError } = useSpeaker(slug);
   const recorder = useRecorder();
   const { recording, level } = recorder;
 
@@ -89,8 +89,16 @@ export function ChatPanel({
 
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = "44px";
+    field.style.height = `${Math.min(128, Math.max(44, field.scrollHeight))}px`;
+  }, [input]);
   const messagesRef = useRef<Msg[]>([]);
   const callRef = useRef(false);
+  const lastSpeechRef = useRef<{ id: string; speech: { text: string; token?: string; language?: string } } | null>(null);
   const voiceOnRef = useRef(voiceOn);
   const busyRef = useRef(false);
   const requestRef = useRef<AbortController | null>(null);
@@ -117,10 +125,10 @@ export function ChatPanel({
   // The AI opens the conversation: it says hello out loud, in the visitor's language, the moment the chat opens.
   useEffect(() => {
     let live = true;
-    let timeout: ReturnType<typeof setTimeout>;
-    const slow = new Promise<null>((r) => { timeout = setTimeout(() => r(null), 1000); });
-    void Promise.race([loadGreeting(slug, preview), slow]).then((g) => {
+    void loadGreeting(slug, preview).then((g) => {
         if (!live || busyRef.current || messagesRef.current.length) return;
+        // An unsaved editor name must not be replaced by the stored greeting.
+        if (preview && g?.text !== fallbackRef.current) return;
         const ready = g ?? { text: fallbackRef.current, audioUrl: null };
         setGreeting(ready);
         // A dashboard preview opens without a tap, and browsers block sound until the visitor interacts.
@@ -128,19 +136,20 @@ export function ChatPanel({
     });
     return () => {
       live = false;
-      clearTimeout(timeout);
     };
   }, [slug, preview, speak]);
 
-  const listenInCall = useCallback(() => {
+  const listenRef = useRef<() => void>(() => {});
+  const listenInCall = useCallback((): void => {
     setCallError(null);
     setCallState("listening");
     void recorder.start({
+      continuous: true,
       onDone: (clip) => {
         if (!callRef.current) return;
         if (!clip) {
-          setCallState("idle");
-          setCallError("I didn't hear anything. Tap the circle when you're ready to talk.");
+          // Quiet thinking time is normal in a call; keep listening without an API request.
+          listenRef.current();
           return;
         }
         setCallState("thinking");
@@ -153,6 +162,7 @@ export function ChatPanel({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.start]);
+  useEffect(() => { listenRef.current = listenInCall; }, [listenInCall]);
 
   /** Sends a typed message, or a recording that Gemini writes down first (any language). */
   async function ask({ text, audio }: { text?: string; audio?: Recording }) {
@@ -173,18 +183,20 @@ export function ChatPanel({
     const replyId = uid();
     const controller = new AbortController();
     requestRef.current = controller;
+    let timedOut = false;
+    const responseDeadline = setTimeout(() => { timedOut = true; controller.abort(); }, 45000);
     try {
       const res = await fetch(`/api/chat/${slug}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history, audio, preview, source, stream: true }),
+        body: JSON.stringify({ messages: history, audio, preview, source, stream: true, voice: callRef.current || voiceOnRef.current }),
         signal: controller.signal,
       });
       if (!res.ok) {
         const failure = await res.json().catch(() => ({}));
         throw new Error(failure.error || "Something went wrong.");
       }
-      let json: { reply?: string; transcript?: string; speakToken?: string; booked?: boolean };
+      let json: { reply?: string; transcript?: string; speakToken?: string; booked?: boolean; language?: string };
       if (res.headers.get("content-type")?.includes("application/x-ndjson") && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -233,22 +245,25 @@ export function ChatPanel({
       }
       const reply = String(json.reply ?? "").trim() || "Sorry, I didn't quite get that. Could you say it another way?";
       const id = replyId;
-      const speech = { text: reply, token: typeof json.speakToken === "string" ? json.speakToken : undefined };
-      setMessages((m) => [...m.filter((x) => x.id !== replyId), { id, role: "assistant", content: reply, token: speech.token }]);
+      const speech = { text: reply, language: typeof json.language === "string" ? json.language : undefined, token: typeof json.speakToken === "string" ? json.speakToken : undefined };
+      lastSpeechRef.current = { id, speech };
+      setMessages((m) => [...m.filter((x) => x.id !== replyId), { id, role: "assistant", content: reply, token: speech.token, language: speech.language }]);
       setAnimatingId(id);
       if (json.booked) setBooked(true);
       if (callRef.current) {
         setLastReply(reply);
         setCallState("speaking");
-        void speak(id, speech, () => {
-          if (callRef.current) setCallState("idle");
+        void speak(id, speech, (success) => {
+          if (!callRef.current) return;
+          if (success) listenInCall();
+          else setCallState("idle");
         });
       } else if (voiceOnRef.current) {
         void speak(id, speech);
       }
     } catch (e) {
-      if (controller.signal.aborted) return;
-      const message = e instanceof Error ? e.message : "Something went wrong.";
+      if (controller.signal.aborted && !timedOut) return;
+      const message = timedOut ? "The reply took too long. If you were booking, check your confirmation before retrying." : e instanceof Error ? e.message : "Something went wrong.";
       setMessages((m) => m.filter((x) => x.id !== userMsg.id && x.id !== replyId));
       if (callRef.current) {
         setCallState("idle");
@@ -258,6 +273,7 @@ export function ChatPanel({
         if (content) setInput(content);
       }
     } finally {
+      clearTimeout(responseDeadline);
       if (requestRef.current === controller) requestRef.current = null;
       setBusy(false);
       busyRef.current = false;
@@ -284,6 +300,7 @@ export function ChatPanel({
     recorder.cancel();
     stopSpeaking();
     setLastReply("");
+    lastSpeechRef.current = null;
     setHeard("");
     callRef.current = true;
     setCall(true);
@@ -312,7 +329,15 @@ export function ChatPanel({
     voicePref.set(!voiceOn);
   }
 
-  const say = (id: string, speech: { text: string; audioUrl?: string | null; token?: string }) => {
+  function retryCallVoice() {
+    const last = lastSpeechRef.current;
+    if (!last || busyRef.current) return;
+    unlockAudio();
+    setCallState("speaking");
+    void speak(last.id, last.speech, (success) => { if (callRef.current) { if (success) listenInCall(); else setCallState("idle"); } });
+  }
+
+  const say = (id: string, speech: { text: string; audioUrl?: string | null; token?: string; language?: string }) => {
     unlockAudio();
     if (speakingId === id) stopSpeaking();
     else void speak(id, speech);
@@ -321,11 +346,11 @@ export function ChatPanel({
   const hasUserMessage = messages.some((m) => m.role === "user");
   const greetingDone = greeting && animatingId !== GREETING_ID;
   const suggestions = ["What do you offer?", "How much does it cost?", ...(booking ? ["Book an appointment"] : [])];
-  const status = recording ? "Listening…" : speakingId ? "Speaking…" : busy ? "Thinking…" : preview ? "Preview · only you can see this" : "Online · any language";
+  const status = recording ? "Listening…" : preparing ? "Preparing voice…" : speakingId ? "Speaking…" : busy ? "Thinking…" : preview ? "Preview · only you can see this" : "Online · multilingual";
 
   return (
     <div className={cn("relative flex min-h-0 flex-col overflow-hidden bg-white", className)}>
-      <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3.5">
+      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-white px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5">
         <div className={cn("ai-avatar relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-2 to-brand text-white", speakingId && "is-speaking")}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -336,7 +361,7 @@ export function ChatPanel({
           <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-success" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-bold">{businessName} AI</p>
+          <p className="truncate font-bold" dir="auto">{businessName} AI</p>
           <p className="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
             {speakingId ? <VoiceBars className="h-3 text-brand" /> : !busy && !recording && !preview && <Languages className="h-3 w-3" />}
             {status}
@@ -388,7 +413,7 @@ export function ChatPanel({
             onProgress={scrollDown}
             onDone={() => setAnimatingId((id) => (id === m.id ? null : id))}
             speaking={speakingId === m.id}
-            onSpeak={m.role === "assistant" && !m.streaming ? () => say(m.id, { text: m.content, token: m.token }) : undefined}
+            onSpeak={m.role === "assistant" && !m.streaming ? () => say(m.id, { text: m.content, token: m.token, language: m.language }) : undefined}
           />
         ))}
         {busy && <TypingDots />}
@@ -415,6 +440,7 @@ export function ChatPanel({
       </div>
 
       {error && <p role="alert" className="shrink-0 border-t border-line bg-stamp/5 px-5 py-2 text-sm text-stamp">{error}</p>}
+      {voiceError && !call && <p role="alert" className="shrink-0 border-t border-line bg-cream px-4 py-2 text-xs text-ink-2">{voiceError}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -442,6 +468,8 @@ export function ChatPanel({
           </div>
         ) : (
           <textarea
+            ref={inputRef}
+            dir="auto"
             id={`chat-${slug}`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -464,13 +492,13 @@ export function ChatPanel({
       <p className="shrink-0 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-[10px] text-muted">AI answers may be imperfect. Powered by TapSynk.</p>
 
       {call && (
-        <div className="call-in absolute inset-0 z-20 flex flex-col items-center justify-between overflow-y-auto bg-[radial-gradient(120%_80%_at_50%_0%,#1d5bff_0%,#121a36_55%,#0b0f1d_100%)] px-6 pb-8 pt-10 text-white" role="dialog" aria-label="Voice chat">
+        <div className="call-in absolute inset-0 z-20 grid grid-rows-[auto_minmax(0,1fr)_auto] gap-4 bg-[radial-gradient(120%_80%_at_50%_0%,#1d5bff_0%,#121a36_55%,#0b0f1d_100%)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 text-white sm:px-6 sm:pt-8" role="dialog" aria-label="Voice chat">
           <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Voice chat · any language</p>
             <p className="mt-1 text-lg font-bold">{businessName} AI</p>
           </div>
 
-          <div className="flex w-full flex-col items-center">
+          <div className="flex min-h-0 w-full flex-col items-center overflow-y-auto overscroll-contain py-2">
             <button
               type="button"
               onClick={tapOrb}
@@ -482,16 +510,18 @@ export function ChatPanel({
                 {callState === "speaking" ? <VoiceBars className="h-9 text-white" /> : callState === "thinking" ? <TypingDots bare /> : <Mic className="h-10 w-10" />}
               </span>
             </button>
-            <p className="mt-8 text-sm font-semibold text-white/70" aria-live="polite">
-              {callState === "listening" ? "Listening… just pause when you're done" : callState === "thinking" ? "Thinking…" : callState === "speaking" ? "Speaking · tap to interrupt" : "Tap the circle to talk"}
+            <p className="mt-4 text-center text-sm font-semibold text-white/70" aria-live="polite">
+              {callState === "listening" ? "Listening… just pause when you're done" : callState === "thinking" ? "Thinking…" : callState === "speaking" ? preparing ? "Preparing voice · tap to cancel" : "Speaking · tap to interrupt" : "Tap the circle to talk"}
             </p>
+            {voiceError && <p role="alert" className="mt-3 rounded-xl bg-white/10 p-3 text-center text-sm text-white">{voiceError}</p>}
+            {voiceError && lastReply && <button type="button" onClick={retryCallVoice} className="mt-2 rounded-full border border-white/30 px-4 py-2 text-sm font-semibold">Listen again</button>}
             {heard && callState !== "listening" && <p className="mt-3 line-clamp-2 max-w-full text-center text-sm text-white/55">“{heard}”</p>}
-            <p className="mt-3 max-h-36 w-full overflow-y-auto text-center text-[17px] leading-relaxed text-white">
+            <p dir="auto" className="mt-3 w-full whitespace-pre-wrap break-words text-center text-base leading-relaxed text-white">
               {callState === "speaking" ? lastReply : callState === "idle" ? callError ?? (lastReply || "Ask me anything, out loud, in any language.") : callState === "listening" ? "Go ahead, I'm listening." : ""}
             </p>
           </div>
 
-          <button type="button" onClick={endCall} className="flex shrink-0 items-center gap-2 rounded-full bg-stamp px-6 py-3 font-semibold text-white shadow-lg transition hover:brightness-110">
+          <button type="button" onClick={endCall} className="mx-auto flex shrink-0 items-center gap-2 rounded-full bg-stamp px-6 py-3 font-semibold text-white shadow-lg transition hover:brightness-110">
             <PhoneOff className="h-5 w-5" /> Back to typing
           </button>
         </div>
@@ -570,8 +600,9 @@ function Bubble({
   return (
     <div className={cn("fade-up flex flex-col", role === "user" ? "items-end" : "items-start")}>
       <p
+        dir="auto"
         className={cn(
-          "max-w-[85%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed",
+          "max-w-[92%] break-words whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed sm:max-w-[85%]",
           role === "user" ? "rounded-2xl rounded-br-md bg-brand text-white" : "rounded-2xl rounded-bl-md bg-white text-ink shadow-sm",
           speaking && "ring-2 ring-brand/30",
         )}

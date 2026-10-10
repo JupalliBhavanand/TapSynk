@@ -2,6 +2,7 @@ import { requireDashboardData } from "@/lib/data";
 import { hasAi, isActive, type Appointment } from "@/lib/types";
 import { AiLocked } from "@/components/AiLocked";
 import { AppointmentsBoard } from "./AppointmentsBoard";
+import { BookingLanguageButton } from "./BookingLanguageButton";
 
 export default async function AppointmentsPage() {
   const { supabase, card, agent, subscription } = await requireDashboardData();
@@ -21,6 +22,7 @@ export default async function AppointmentsPage() {
       ) : (
         <>
           {!ai && <p className="mb-6 rounded-xl border border-cream-line bg-cream px-4 py-3 text-sm">New bookings need the AI Card plan. Your past appointments are still here.</p>}
+          {all.some((item) => item.booking_language !== "en") && <BookingLanguageButton />}
           <AppointmentsBoard items={all} tz={tz} />
         </>
       )}

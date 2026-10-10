@@ -11,6 +11,9 @@ import { getUser } from "@/lib/supabase/server";
 import { hasAi } from "@/lib/types";
 import { clientIp } from "@/lib/utils";
 import { speakToken } from "@/lib/voice";
+import { sendAppointmentConfirmation, type Confirmation } from "@/lib/appointment-mail";
+import { canBookAppointment } from "@/lib/booking-quota";
+import { prepareReplyAudio } from "@/lib/reply-audio";
 
 export const maxDuration = 60;
 
@@ -21,6 +24,7 @@ const requestSchema = z.object({
   preview: z.boolean().optional(),
   source: z.string().max(8).optional(),
   stream: z.boolean().optional(),
+  voice: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[slug]">) {
@@ -52,9 +56,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
 
   try {
     let transcript: string | undefined;
+    let language: string | undefined;
     let history = body.data.messages;
     if (body.data.audio) {
-      transcript = await transcribe(body.data.audio.data, body.data.audio.mimeType);
+      ({ transcript, language } = await transcribe(body.data.audio.data, body.data.audio.mimeType));
       if (!transcript) return NextResponse.json({ transcript: "" });
       history = [...history, { role: "user" as const, content: transcript.slice(0, 2000) }].slice(-30);
       while (history[0]?.role === "assistant") history = history.slice(1);
@@ -68,11 +73,26 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
       });
     }
 
+    const confirmations: Confirmation[] = [];
+    let voicePreparation: Promise<unknown> | undefined;
+    after(async () => {
+      await Promise.allSettled([
+        ...(voicePreparation ? [voicePreparation] : []),
+        ...confirmations.map((booking) => sendAppointmentConfirmation(booking)),
+      ]);
+    });
+    const prepareVoice = (reply: string) => {
+      if (body.data.voice) voicePreparation = prepareReplyAudio(slug, reply, language).catch(() => {
+        // Text remains usable, and Listen can retry failed voice generation.
+      });
+    };
     const agentOptions = {
       card,
       agent,
       history: valid.data,
-      canBook: () => rateLimit(`book:${ip}:${card.id}`, 3, 86400),
+      replyLanguage: language,
+      onBooked: (booking: Confirmation) => { confirmations.push(booking); },
+      canBook: (email: string) => isOwner ? Promise.resolve(true) : canBookAppointment(card.id, email),
     };
     if (body.data.stream) {
       const generation = new AbortController();
@@ -83,9 +103,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
           const emit = (event: object) => {
             if (!canceled) controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
           };
-          emit({ type: "transcript", transcript });
+          emit({ type: "transcript", transcript, language });
           void runAgent({ ...agentOptions, signal: generation.signal, onText: (text, reset) => emit({ type: "text", text, reset: Boolean(reset) }) })
-            .then((result) => emit({ type: "done", ...result, transcript, speakToken: speakToken(slug, result.reply) }))
+            .then((result) => {
+              if (!canceled) prepareVoice(result.reply);
+              emit({ type: "done", ...result, transcript, language, speakToken: speakToken(slug, result.reply) });
+            })
             .catch((e: unknown) => {
               console.error("Streaming chat error", e);
               emit({ type: "error", error: "The assistant is unavailable right now. Please try again." });
@@ -97,7 +120,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
       return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } });
     }
     const result = await runAgent(agentOptions);
-    return NextResponse.json({ ...result, transcript, speakToken: speakToken(slug, result.reply) });
+    prepareVoice(result.reply);
+    return NextResponse.json({ ...result, transcript, language, speakToken: speakToken(slug, result.reply) });
   } catch (e) {
     if (e instanceof ApiError && e.status === 429) return NextResponse.json({ error: "The assistant is busy. Please try again in a moment." }, { status: 503 });
     if (e instanceof ApiError) console.error("Gemini API error", e.status, e.message);

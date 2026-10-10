@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Check, Globe, Loader2, Sparkles } from "lucide-react";
 import { ChatPanel } from "@/components/ChatWidget";
 import { introLine } from "@/lib/greeting";
+import { businessIdentity, learnedBusinessName } from "@/lib/business-identity";
 import type { Agent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { saveAgent, type AgentInput } from "../actions";
@@ -29,7 +30,7 @@ export function AgentEditor({
   company?: boolean;
 }) {
   const [form, setForm] = useState<Form>(() => ({
-    business_name: initial?.business_name || businessName,
+    business_name: businessIdentity(initial?.business_name, businessName, ownerName, initial?.knowledge),
     description: initial?.description ?? "",
     services: initial?.services ?? "",
     faq: initial?.faq ?? "",
@@ -78,6 +79,8 @@ export function AgentEditor({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       set("knowledge", json.knowledge);
+      const learnedName = learnedBusinessName(json.knowledge);
+      if (learnedName) set("business_name", learnedName);
       setStatus({ ok: `Learned from ${json.pages.length} page${json.pages.length === 1 ? "" : "s"}. Review it below, then save.` });
     } catch (e) {
       setStatus({ error: e instanceof Error ? e.message : "Could not learn from that website." });
@@ -215,7 +218,7 @@ export function AgentEditor({
       <aside className="xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-sm font-semibold text-muted">Test your AI</p>
         {saved && slug ? (
-          <ChatPanel slug={slug} businessName={form.business_name || businessName} ownerName={ownerName} intro={introLine(form.description)} booking={form.booking_enabled} preview className="h-[600px] rounded-[24px] border border-line shadow-lg" />
+          <ChatPanel key={`${form.business_name}:${form.description}:${form.booking_enabled}`} slug={slug} businessName={form.business_name || businessName} ownerName={ownerName} intro={introLine(form.description)} booking={form.booking_enabled} preview className="h-[600px] rounded-[24px] border border-line shadow-lg" />
         ) : (
           <div className="card-surface grid h-[300px] place-items-center p-8 text-center text-sm text-muted">{saved ? "Add an employee card to test your company AI." : "Save your AI agent to start chatting with it."}</div>
         )}

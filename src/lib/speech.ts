@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { VoiceActivity } from "@/lib/voice-activity";
+import { StreamPlayer } from "@/lib/stream-player";
+import { pcmWav } from "@/lib/pcm";
 
 /*
  * Voice for the AI chat.
  * - Speaking: replies are read aloud in the AI's Gemini voice (any language), played through one shared
- *   <audio> element that is unlocked by the visitor's tap. The browser's own voice is only a fallback.
+ *   <audio> element unlocked by the visitor's tap. The configured voice never changes on failure.
  * - Listening: the microphone is recorded as a small WAV clip that stops by itself when the visitor
  *   pauses; Gemini writes it down in whatever language they spoke.
  */
@@ -58,22 +60,22 @@ export function unlockAudio() {
     p.src = SILENT_WAV;
     p.play().then(() => (unlocked = true)).catch(() => {});
   }
-  try {
-    const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 0;
-    window.speechSynthesis.speak(u);
-  } catch {}
   audioContext()?.resume().catch(() => {});
 }
 
-export type Speech = { text: string; audioUrl?: string | null; token?: string };
+export type Speech = { text: string; audioUrl?: string | null; token?: string; language?: string };
 
 /** Reads replies aloud in the AI's voice. One thing speaks at a time. */
 export function useSpeaker(slug: string) {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const run = useRef(0);
   const urls = useRef(new Map<string, string>());
+  const brokenUrls = useRef(new Set<string>());
   const pending = useRef<AbortController | null>(null);
+  const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streaming = useRef<StreamPlayer | null>(null);
 
   useEffect(() => {
     const runs = run;
@@ -81,6 +83,8 @@ export function useSpeaker(slug: string) {
     return () => {
       runs.current++;
       pending.current?.abort();
+      streaming.current?.stop();
+      if (watchdog.current) clearTimeout(watchdog.current);
       player?.pause();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       made.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
@@ -90,41 +94,91 @@ export function useSpeaker(slug: string) {
   const stop = useCallback(() => {
     run.current++;
     pending.current?.abort();
+    streaming.current?.stop();
+    if (watchdog.current) clearTimeout(watchdog.current);
     player?.pause();
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeakingId(null);
+    setPreparing(false);
+    setVoiceError(null);
   }, []);
 
   /** Speaks a message; `onDone` runs once when it finishes (not when stopped). */
   const speak = useCallback(
-    async (id: string, speech: Speech, onDone?: () => void) => {
+    async (id: string, speech: Speech, onDone?: (success: boolean) => void) => {
       const me = ++run.current;
       pending.current?.abort();
+      streaming.current?.stop();
+      if (watchdog.current) clearTimeout(watchdog.current);
       player?.pause();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       setSpeakingId(id);
+      setPreparing(true);
+      setVoiceError(null);
       let finished = false;
-      const finish = () => {
+      const finish = (success = true) => {
         if (finished || run.current !== me) return;
         finished = true;
+        if (watchdog.current) clearTimeout(watchdog.current);
+        player?.pause();
+        streaming.current?.stop();
         setSpeakingId(null);
-        onDone?.();
+        setPreparing(false);
+        onDone?.(success);
+      };
+      const fail = (message: string) => {
+        if (finished || run.current !== me) return;
+        setVoiceError(message);
+        finish(false);
       };
 
-      let url = speech.audioUrl || urls.current.get(id);
+      let url = (speech.audioUrl && !brokenUrls.current.has(speech.audioUrl) ? speech.audioUrl : undefined) || urls.current.get(id);
       if (!url && speech.token) {
         const controller = new AbortController();
         pending.current = controller;
         // Do not leave a phone waiting indefinitely for a separate TTS request.
-        const timeout = setTimeout(() => controller.abort(), 1800);
+        const timeout = setTimeout(() => controller.abort(), 20000);
         try {
           const res = await fetch(`/api/chat/${slug}/speak`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ text: speech.text, token: speech.token }),
+            body: JSON.stringify({ text: speech.text, token: speech.token, language: speech.language, stream: true }),
             signal: controller.signal,
           });
           if (res.ok) {
+            if (res.headers?.get("content-type")?.startsWith("audio/l16") && res.body) {
+              const ac = audioContext();
+              if (!ac) throw new Error("Audio playback is unavailable.");
+              await ac.resume();
+              if (ac.state !== "running") throw new Error("Tap Listen to enable audio.");
+              const arm = () => {
+                if (run.current !== me || finished) return;
+                setPreparing(false);
+                if (watchdog.current) clearTimeout(watchdog.current);
+                watchdog.current = setTimeout(() => fail("Audio playback stopped responding. Tap Listen to retry."), 15000);
+              };
+              const output = new StreamPlayer(ac, () => finish(), arm);
+              streaming.current = output;
+              const reader = res.body.getReader();
+              const chunks: Uint8Array[] = [];
+              let bytes = 0;
+              try {
+                while (true) {
+                  const chunk = await reader.read();
+                  if (run.current !== me) { await reader.cancel(); return; }
+                  if (chunk.done) break;
+                  bytes += chunk.value.length;
+                  if (bytes <= 2_000_000) chunks.push(chunk.value);
+                  output.push(chunk.value);
+                }
+                if (bytes <= 2_000_000) urls.current.set(id, URL.createObjectURL(new Blob([pcmWav(chunks).buffer as ArrayBuffer], { type: "audio/wav" })));
+                output.end();
+                return;
+              } catch {
+                output.stop();
+                return fail("Audio was interrupted. Tap Listen to retry; your reply is available as text.");
+              } finally { reader.releaseLock(); }
+            }
             url = URL.createObjectURL(await res.blob());
             urls.current.set(id, url);
           }
@@ -134,67 +188,47 @@ export function useSpeaker(slug: string) {
         }
       }
       if (run.current !== me) return;
-      if (!url) return browserSpeak(speech.text, () => run.current === me, finish);
+      if (!url) return fail("The AI voice could not load. Tap Listen to retry; your reply is still available as text.");
 
       const p = getPlayer();
-      p.onended = finish;
-      p.onerror = () => run.current === me && browserSpeak(speech.text, () => run.current === me, finish);
+      p.onended = () => finish();
+      p.onerror = () => {
+        if (speech.audioUrl) brokenUrls.current.add(speech.audioUrl);
+        urls.current.delete(id);
+        if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+        fail("Audio could not play. Tap Listen to retry.");
+      };
+      const arm = () => {
+        if (run.current !== me || finished) return;
+        if (watchdog.current) clearTimeout(watchdog.current);
+        watchdog.current = setTimeout(() => fail("Audio playback stopped responding. Tap Listen to retry."), 15000);
+      };
+      let position = 0;
+      p.ontimeupdate = () => {
+        if (p.currentTime > position + 0.01) { position = p.currentTime; arm(); }
+      };
+      p.onplaying = () => {
+        if (run.current !== me || finished) return;
+        setPreparing(false);
+        arm();
+      };
       p.src = url;
+      arm();
       p.play().catch((e: unknown) => {
         if (run.current !== me) return;
-        // Not allowed yet (no tap): stay quiet rather than fail loudly.
-        if (e instanceof DOMException && e.name === "NotAllowedError") finish();
-        else if (!(e instanceof DOMException && e.name === "AbortError")) browserSpeak(speech.text, () => run.current === me, finish);
+        if (e instanceof DOMException && e.name === "NotAllowedError") fail("Tap Listen to allow audio playback on this phone.");
+        else fail("Audio could not start. Tap Listen to retry.");
       });
     },
     [slug],
   );
 
-  return { speak, stop, speakingId };
-}
-
-const NICE_VOICE = /natural|neural|premium|enhanced|google|samantha|aria|jenny|ava|allison|serena|daniel/i;
-
-/** Fallback when the AI voice can't load: the device's built-in voice. */
-function browserSpeak(text: string, current: () => boolean, done: () => void) {
-  if (!("speechSynthesis" in window)) return done();
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  const clean = speakable(text);
-  // Short chunks avoid Chrome cutting off long utterances after ~15 seconds.
-  const chunks = clean.match(/[^.!?。！？]+[.!?。！？]*\s*/g)?.map((c) => c.trim()).filter(Boolean) ?? [];
-  if (!chunks.length) return done();
-  const voices = synth.getVoices();
-  const lang = (navigator.language || "en-US").toLowerCase();
-  const sameLang = voices.filter((v) => v.lang.toLowerCase().startsWith(lang.split("-")[0]!));
-  const voice = sameLang.find((v) => NICE_VOICE.test(v.name)) ?? sameLang[0];
-  let finished = false;
-  const finish = () => {
-    if (finished || !current()) return;
-    finished = true;
-    clearTimeout(safety);
-    done();
-  };
-  chunks.forEach((chunk, i) => {
-    const u = new SpeechSynthesisUtterance(chunk);
-    if (voice) {
-      u.voice = voice;
-      u.lang = voice.lang;
-    }
-    u.rate = 1.03;
-    if (i === chunks.length - 1) {
-      u.onend = finish;
-      u.onerror = finish;
-    }
-    synth.speak(u);
-  });
-  // Some browsers never fire onend; don't leave the chat stuck.
-  const safety = setTimeout(finish, 4000 + clean.split(" ").length * 550);
+  return { speak, stop, speakingId, preparing, voiceError };
 }
 
 // ---------- The AI's greeting ----------
 
-export type Greeting = { text: string; audioUrl: string | null };
+export type Greeting = { text: string; audioUrl: string | null; token?: string; language?: string };
 const greetings = new Map<string, Promise<Greeting | null>>();
 
 /**
@@ -206,19 +240,20 @@ export function loadGreeting(slug: string, fresh = false): Promise<Greeting | nu
   const key = `${slug}:${lang}`;
   const cached = greetings.get(key);
   if (cached && !fresh) return cached;
-  const promise = fetch(`/api/chat/${slug}/greeting?lang=${encodeURIComponent(lang)}`)
+  const promise = fetch(`/api/chat/${slug}/greeting?lang=${encodeURIComponent(lang)}`, { signal: AbortSignal.timeout(20000) })
     .then((r) => (r.ok ? (r.json() as Promise<Greeting>) : null))
     .then(async (g) => {
       if (!g?.text) return null;
       if (g.audioUrl && !g.audioUrl.startsWith("data:")) {
         try {
-          const res = await fetch(g.audioUrl);
+          const res = await fetch(g.audioUrl, { signal: AbortSignal.timeout(10000) });
           if (res.ok) g.audioUrl = URL.createObjectURL(await res.blob());
         } catch {}
       }
       return g;
     })
-    .catch(() => null);
+    .catch(() => null)
+    .then((g) => { if (!g?.audioUrl) greetings.delete(key); return g; });
   greetings.set(key, promise);
   return promise;
 }
@@ -241,7 +276,6 @@ export type ListenError = "denied" | "unavailable";
 
 const TARGET_RATE = 16000;
 const MAX_MS = 30000;
-const PAUSE_MS = 650;
 const NO_SPEECH_MS = 8000;
 
 /** Records one spoken message. It stops by itself when the visitor pauses, or when `stop()` is called. */
@@ -249,13 +283,20 @@ export function useRecorder() {
   const [recording, setRecording] = useState(false);
   const [level, setLevel] = useState(0);
   const active = useRef<{ finish: (send: boolean) => void } | null>(null);
+  const microphone = useRef<MediaStream | null>(null);
+  const noiseFloor = useRef<number | undefined>(undefined);
+  const releaseMicrophone = useCallback(() => {
+    microphone.current?.getTracks().forEach((track) => track.stop());
+    microphone.current = null;
+    noiseFloor.current = undefined;
+  }, []);
 
-  useEffect(() => () => active.current?.finish(false), []);
+  useEffect(() => () => { active.current?.finish(false); releaseMicrophone(); }, [releaseMicrophone]);
 
   const stop = useCallback(() => active.current?.finish(true), []);
-  const cancel = useCallback(() => active.current?.finish(false), []);
+  const cancel = useCallback(() => { active.current?.finish(false); releaseMicrophone(); }, [releaseMicrophone]);
 
-  const start = useCallback(async (handlers: { onDone: (clip: Recording | null) => void; onError?: (e: ListenError) => void }) => {
+  const start = useCallback(async (handlers: { onDone: (clip: Recording | null) => void; onError?: (e: ListenError) => void; continuous?: boolean }) => {
     active.current?.finish(false);
     const ac = audioContext();
     if (!ac || !navigator.mediaDevices?.getUserMedia) return handlers.onError?.("unavailable");
@@ -271,8 +312,11 @@ export function useRecorder() {
     setRecording(true);
 
     let stream: MediaStream;
+    let reused = false;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 } });
+      const ready = microphone.current;
+      reused = Boolean(ready?.getAudioTracks().some((track) => track.readyState === "live"));
+      stream = reused ? ready! : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 } });
       await resumed;
     } catch (e) {
       if (active.current !== session) return;
@@ -282,9 +326,10 @@ export function useRecorder() {
       return handlers.onError?.(denied ? "denied" : "unavailable");
     }
     if (active.current !== session) {
-      stream.getTracks().forEach((t) => t.stop());
+      if (!reused) stream.getTracks().forEach((t) => t.stop());
       return;
     }
+    microphone.current = stream;
 
     const source = ac.createMediaStreamSource(stream);
     const highpass = ac.createBiquadFilter();
@@ -296,7 +341,7 @@ export function useRecorder() {
     const processor = ac.createScriptProcessor(1024, 1, 1);
     const chunks: Float32Array[] = [];
     const started = performance.now();
-    const activity = new VoiceActivity();
+    const activity = new VoiceActivity(reused ? noiseFloor.current : undefined);
     let done = false;
 
     session.finish = (send: boolean) => {
@@ -309,7 +354,9 @@ export function useRecorder() {
         lowpass.disconnect();
         processor.disconnect();
       } catch {}
-      stream.getTracks().forEach((t) => t.stop());
+      // Keep the device ready during calls, but disconnect recording before AI playback.
+      noiseFloor.current = activity.noiseFloor;
+      if (!handlers.continuous) releaseMicrophone();
       if (active.current === session) active.current = null;
       setRecording(false);
       setLevel(0);
@@ -317,7 +364,7 @@ export function useRecorder() {
       if (!send) return;
       if (!activity.heard || !chunks.length) return handlers.onDone(null);
       const samples = merge(chunks);
-      const from = Math.max(0, Math.floor(((activity.firstVoiceMs ?? 0) - 180) * ac.sampleRate / 1000));
+      const from = Math.max(0, Math.floor(((activity.firstVoiceMs ?? 0) - 300) * ac.sampleRate / 1000));
       const to = Math.min(samples.length, Math.ceil((activity.lastVoiceMs + 200) * ac.sampleRate / 1000));
       handlers.onDone({ data: toBase64(encodeWav(downsample(samples.subarray(from, to), ac.sampleRate, TARGET_RATE), TARGET_RATE)), mimeType: "audio/wav" });
     };
@@ -332,14 +379,14 @@ export function useRecorder() {
       const elapsed = now - started;
       const voiced = activity.update(rms, elapsed, input.length / ac.sampleRate * 1000);
       setLevel(voiced ? Math.min(1, rms * 9) : 0);
-      if ((activity.heard && elapsed - activity.lastVoiceMs > PAUSE_MS) || elapsed > MAX_MS) session.finish(true);
+      if ((activity.heard && elapsed - activity.lastVoiceMs > activity.pauseMs) || elapsed > MAX_MS) session.finish(true);
       else if (!activity.heard && elapsed > NO_SPEECH_MS) session.finish(true);
     };
     source.connect(highpass);
     highpass.connect(lowpass);
     lowpass.connect(processor);
     processor.connect(ac.destination);
-  }, []);
+  }, [releaseMicrophone]);
 
   return { start, stop, cancel, recording, level };
 }

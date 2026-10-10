@@ -1,0 +1,238 @@
+{
+  "results": [
+    {
+      "route": "/",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/pricing",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/demo",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/privacy",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/terms",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/login",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/signup",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/forgot-password",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/reset-password",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/c/bhavanand-jupalli",
+      "width": 390,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/pricing",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/demo",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/privacy",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/terms",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/login",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/signup",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/forgot-password",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/reset-password",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/c/bhavanand-jupalli",
+      "width": 1440,
+      "status": 200,
+      "overflow": false,
+      "runtimeErrors": [],
+      "ok": true
+    },
+    {
+      "route": "/dashboard",
+      "protected": true,
+      "ok": true
+    },
+    {
+      "route": "/dashboard/appointments",
+      "protected": true,
+      "ok": true
+    },
+    {
+      "route": "/dashboard/company",
+      "protected": true,
+      "ok": true
+    },
+    {
+      "route": "/dashboard/billing",
+      "protected": true,
+      "ok": true
+    },
+    {
+      "check": "signup invalid-email validation",
+      "ok": true
+    },
+    {
+      "route": "/api/demo",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "ok": true
+    },
+    {
+      "route": "/api/chat/missing-card",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "ok": true
+    },
+    {
+      "route": "/api/chat/missing-card/speak",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "ok": true
+    },
+    {
+      "route": "/api/stripe/checkout",
+      "method": "POST",
+      "status": 401,
+      "expected": 401,
+      "ok": true
+    },
+    {
+      "route": "/api/ai/learn",
+      "method": "POST",
+      "status": 401,
+      "expected": 401,
+      "ok": true
+    },
+    {
+      "route": "/api/leads/export",
+      "method": "GET",
+      "status": 307,
+      "expected": 307,
+      "ok": true
+    },
+    {
+      "route": "/api/vcard/missing-card",
+      "method": "GET",
+      "status": 404,
+      "expected": 404,
+      "ok": true
+    }
+  ],
+  "failures": []
+}

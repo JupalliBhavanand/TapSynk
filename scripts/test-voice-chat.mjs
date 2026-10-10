@@ -11,6 +11,11 @@ function load(file, mocks = {}) {
   return mod.exports;
 }
 const { VoiceActivity } = load('src/lib/voice-activity.ts');
+const identity = load('src/lib/business-identity.ts');
+assert.equal(identity.businessIdentity('Tapsync', 'Tapsync', 'Bhavanand', '### Overview\nRavOwl is an AI-powered security platform.'), 'RavOwl');
+assert.equal(identity.businessIdentity('TapSynk', '', 'Shiva', ''), 'Shiva');
+assert.equal(identity.businessIdentity('My Company', '', 'Shiva', 'Business name: RavOwl'), 'My Company');
+assert.equal(identity.learnedBusinessName('Business name: RavOwl\nOverview\nSecurity platform.'), 'RavOwl');
 function sample(levels) {
   const detector = new VoiceActivity();
   for (let i = 0; i < levels.length; i++) detector.update(levels[i], (i + 1) * 20, 20);
@@ -28,18 +33,22 @@ const response = (parts, finishReason) => Object.assign(new GenerateContentRespo
 const delta = [];
 const model = { models: { async *generateContentStream(params) {
   assert.equal(params.config.maxOutputTokens, 768);
+  assert.match(params.config.systemInstruction, /microphone utterance is in language hi/);
   yield response([{ text: 'Internal reasoning', thought: true, thoughtSignature: 'signature' }]);
   yield response([{ text: 'Hello ' }]);
   yield response([{ text: 'there.' }], 'STOP');
 } } };
 const { runAgent } = load('src/lib/agent.ts', {
+  '@/lib/appointment-mail': { mailConfigurationError: () => undefined },
+  '@/lib/booking-language': {},
+  '@/lib/business-identity': load('src/lib/business-identity.ts'),
   'server-only': {}, '@/lib/gemini': { gemini: () => model, GEMINI_MODEL: 'test', LOW_THINKING: {} },
   '@/lib/slots': { isValidTimeZone: () => true }, '@/lib/supabase/admin': {},
 });
 const result = await runAgent({
   card: { full_name: 'Test Owner', company: 'Test', email: 'test@example.com' },
   agent: { tone: 'friendly', timezone: 'UTC', booking_enabled: false },
-  history: [{ role: 'user', content: 'Hello' }], canBook: async () => true,
+  replyLanguage: 'hi', history: [{ role: 'user', content: 'नमस्ते' }], canBook: async () => true,
   onText: (text, reset) => delta.push({ text, reset }),
 });
 assert.equal(result.reply, 'Hello there.');

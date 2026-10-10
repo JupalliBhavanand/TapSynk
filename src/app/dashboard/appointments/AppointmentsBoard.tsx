@@ -191,7 +191,7 @@ export function AppointmentsBoard({ items, tz }: { items: Appointment[]; tz: str
                       {a.notes && <p className="mt-2 rounded-xl bg-bg px-3 py-2 text-sm text-ink-2">“{a.notes}”</p>}
                     </div>
                   </div>
-                  <AppointmentActions id={a.id} status={a.status} />
+                  <AppointmentActions id={a.id} status={a.status} emailStatus={a.confirmation_email_status} />
                 </li>
               ))}
             </ul>

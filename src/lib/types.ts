@@ -73,6 +73,9 @@ export interface Appointment {
   ends_at: string;
   status: "confirmed" | "cancelled" | "completed";
   created_at: string;
+  confirmation_email_status?: "not_requested" | "pending" | "sending" | "sent" | "failed";
+  confirmation_email_sent_at?: string | null;
+  booking_language?: string;
 }
 
 export interface Subscription {

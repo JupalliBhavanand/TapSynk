@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { fulfillCheckout, syncSubscription } from "@/lib/billing";
 import { env } from "@/lib/env";
 import { stripe } from "@/lib/stripe";
+import { sendPaymentConfirmation } from "@/lib/payment-mail";
 
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("stripe-signature");
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+      case "invoice.paid":
+        await sendPaymentConfirmation(event.data.object.id);
+        break;
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":
         await fulfillCheckout(event.data.object.id);

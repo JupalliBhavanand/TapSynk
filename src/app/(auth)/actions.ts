@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { SITE_URL } from "@/lib/env";
 import { clientIp } from "@/lib/utils";
+import { safeRedirectPath } from "@/lib/redirect";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -20,8 +21,7 @@ const password = z
 
 /** Only allow same-site relative redirects after login (prevents open redirects). */
 function safeNext(raw: FormDataEntryValue | null) {
-  const v = typeof raw === "string" ? raw : "";
-  return v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\") ? v : "/dashboard";
+  return safeRedirectPath(raw);
 }
 
 async function limited(action: string) {
