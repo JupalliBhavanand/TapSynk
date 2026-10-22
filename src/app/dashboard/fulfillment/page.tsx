@@ -1,16 +1,16 @@
 import { notFound } from "next/navigation";
 import { requireDashboardData } from "@/lib/data";
-import { isAdminEmail, SITE_URL } from "@/lib/env";
+import { isFulfillmentAdminEmail, SITE_URL } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Card, Order } from "@/lib/types";
 import { FulfillmentOrders, type CardPrintDetails, type FulfillmentOrder } from "./FulfillmentOrders";
 
 export const metadata = { title: "Card fulfillment" };
 
-/** Global shipping queue. Only emails listed in ADMIN_EMAILS can open this page. */
+/** Global shipping queue. Only the two designated fulfillment administrators can open this page. */
 export default async function FulfillmentPage() {
   const { user } = await requireDashboardData();
-  if (!isAdminEmail(user.email)) notFound();
+  if (!isFulfillmentAdminEmail(user.email)) notFound();
 
   const admin = createAdminClient();
   const { data, error } = await admin

@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import { DashboardNav } from "@/components/DashboardNav";
 import { Logo } from "@/components/Logo";
 import { getDashboardData } from "@/lib/data";
-import { isAdminEmail } from "@/lib/env";
+import { isAdminEmail, isFulfillmentAdminEmail } from "@/lib/env";
 import { PLANS } from "@/lib/plans";
 import { hasAi, isActive } from "@/lib/types";
 
@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </form>
         </div>
         <div className="mt-4 lg:mt-10">
-          <DashboardNav aiLocked={!hasAi(data.subscription)} admin={isAdminEmail(data.user.email)} />
+          <DashboardNav aiLocked={!hasAi(data.subscription)} admin={isAdminEmail(data.user.email)} fulfillmentAdmin={isFulfillmentAdminEmail(data.user.email)} />
         </div>
         <div className="absolute inset-x-5 bottom-6 hidden lg:block">
           <div className="rounded-2xl border border-line bg-white p-4">

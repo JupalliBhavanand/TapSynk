@@ -16,9 +16,13 @@ const items = [
   { href: "/dashboard/company", label: "Company", icon: Building2 },
 ];
 
-export function DashboardNav({ aiLocked = false, admin = false }: { aiLocked?: boolean; admin?: boolean }) {
+export function DashboardNav({ aiLocked = false, admin = false, fulfillmentAdmin = false }: { aiLocked?: boolean; admin?: boolean; fulfillmentAdmin?: boolean }) {
   const path = usePathname();
-  const links = admin ? [...items, { href: "/dashboard/fulfillment", label: "Fulfillment", icon: PackageCheck }, { href: "/dashboard/demos", label: "Demo requests", icon: Presentation }] : items;
+  const links = [
+    ...items,
+    ...(fulfillmentAdmin ? [{ href: "/dashboard/fulfillment", label: "Fulfillment", icon: PackageCheck }] : []),
+    ...(admin ? [{ href: "/dashboard/demos", label: "Demo requests", icon: Presentation }] : []),
+  ];
   return (
     <nav aria-label="Dashboard" className="flex gap-1 overflow-x-auto lg:flex-col">
       {links.map(({ href, label, icon: Icon, ...rest }) => {
