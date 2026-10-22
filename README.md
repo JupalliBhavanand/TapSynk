@@ -45,7 +45,7 @@ Plans: **Virtual Card** $20/month · $49/3 months · $149/year, **AI Card** $49/
    - Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
    - Settings → Billing → Customer portal: turn it on so customers can update cards and cancel.
    - No extra webhook events are needed for plan switches: AI → Virtual switches use a Stripe subscription schedule, and `customer.subscription.updated` keeps the database in step.
-4. **Admin**: set `ADMIN_EMAILS=you@example.com` (comma-separated) to see website demo requests at `/dashboard/demos`.
+4. **Admin**: set `ADMIN_EMAILS=you@example.com` (comma-separated) to access website demo requests at `/dashboard/demos`. The global shipping queue at `/dashboard/fulfillment` is restricted in code to `bhavanandjupalli@gmail.com` and `vishnuraju15@gmail.com`.
 5. **Gemini**: create an API key at aistudio.google.com → API keys → `GEMINI_API_KEY`. It powers the chat, bookings, website learning, voice listening and the AI's voice. Optional: `GEMINI_MODEL`, `GEMINI_TTS_MODEL`, `GEMINI_VOICE` (default voice `Kore`). Turn on billing for the key before launch: the free tier has low limits.
 6. **Run**: `npm run dev` → http://localhost:3000. Test card: `4242 4242 4242 4242`.
 7. **Deploy**: push to GitHub, import in Vercel, add the same environment variables, set `NEXT_PUBLIC_SITE_URL` to your domain.

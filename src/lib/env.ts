@@ -26,5 +26,15 @@ export function isAdminEmail(email: string | null | undefined) {
   return Boolean(email && admins.includes(email.toLowerCase()));
 }
 
+const FULFILLMENT_ADMIN_EMAILS = new Set([
+  "bhavanandjupalli@gmail.com",
+  "vishnuraju15@gmail.com",
+]);
+
+/** Only these two accounts can view or update the global card fulfillment queue. */
+export function isFulfillmentAdminEmail(email: string | null | undefined) {
+  return Boolean(email && FULFILLMENT_ADMIN_EMAILS.has(email.trim().toLowerCase()));
+}
+
 export const isSupabaseConfigured = () =>
   Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
