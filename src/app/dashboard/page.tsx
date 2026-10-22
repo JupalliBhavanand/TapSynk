@@ -1,10 +1,11 @@
 import Link from "next/link";
 import QRCode from "qrcode";
-import { ArrowRight, Bot, CalendarDays, CheckCircle2, Circle, Eye, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, CheckCircle2, Circle, Sparkles } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { EmailSignature } from "@/components/EmailSignature";
 import { UpgradeToAiButton } from "@/components/UpgradeToAiButton";
 import { PhysicalCard } from "@/components/PhysicalCard";
+import { DashboardOverviewAnalytics, type OverviewMetricSet } from "@/components/DashboardOverviewAnalytics";
 import { requireDashboardData } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
 import { SITE_URL } from "@/lib/env";
@@ -19,16 +20,52 @@ export default async function DashboardHome() {
   const link = card ? `${SITE_URL}/c/${card.slug}` : "";
   const qr = card ? await QRCode.toDataURL(`${link}?s=q`, { margin: 1, width: 360, color: { dark: "#0f1426", light: "#ffffff" } }) : null;
 
-  const { data: upcoming, count: upcomingCount } = card
+  const asOf = new Date();
+  const today = new Date(asOf);
+  today.setUTCHours(0, 0, 0, 0);
+  const monthStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), 1));
+  let orderedAt = card?.created_at ?? asOf.toISOString();
+  let hasOrderDate = false;
+  if (card) {
+    const { data: firstOrder } = await supabase.from("orders").select("created_at").eq("user_id", data.user.id).is("company_id", null).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    orderedAt = firstOrder?.created_at ?? card.created_at;
+    hasOrderDate = Boolean(firstOrder?.created_at);
+  }
+  const periods = {
+    daily: today.toISOString(),
+    monthly: monthStart.toISOString(),
+    yearly: orderedAt,
+  };
+  const overview: Record<keyof typeof periods, OverviewMetricSet> = {
+    daily: { views: 0, saves: 0, ai: 0, upcoming: 0 },
+    monthly: { views: 0, saves: 0, ai: 0, upcoming: 0 },
+    yearly: { views: 0, saves: 0, ai: 0, upcoming: 0 },
+  };
+  if (card) {
+    const kinds = ["view", "save", "ai"] as const;
+    const ranges = Object.entries(periods) as [keyof typeof periods, string][];
+    await Promise.all(ranges.flatMap(([period, start]) => [
+      ...kinds.map(async (kind) => {
+        const { count } = await supabase.from("card_events").select("card_id", { count: "exact", head: true }).eq("card_id", card.id).eq("kind", kind).gte("created_at", start).lte("created_at", asOf.toISOString());
+        overview[period][kind === "view" ? "views" : kind === "save" ? "saves" : "ai"] = count ?? 0;
+      }),
+      (async () => {
+        const { count } = await supabase.from("appointments").select("id", { count: "exact", head: true }).eq("card_id", card.id).eq("status", "confirmed").gte("starts_at", asOf.toISOString()).gte("created_at", start).lte("created_at", asOf.toISOString());
+        overview[period].upcoming = count ?? 0;
+      })(),
+    ]));
+  }
+
+  const { data: upcoming } = card
     ? await supabase
         .from("appointments")
-        .select("*", { count: "exact" })
+        .select("*")
         .eq("card_id", card.id)
         .eq("status", "confirmed")
         .gte("starts_at", new Date().toISOString())
         .order("starts_at")
         .limit(4)
-    : { data: [], count: 0 };
+    : { data: [] };
 
   const steps = [
     { done: Boolean(card), label: "Create your digital card", href: "/dashboard/card" },
@@ -67,22 +104,7 @@ export default async function DashboardHome() {
         </section>
       )}
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Card views", value: card?.views ?? 0, icon: Eye },
-          { label: "Contacts saved", value: card?.saves ?? 0, icon: UserPlus },
-          { label: "AI conversations", value: card?.ai_opens ?? 0, icon: Bot },
-          { label: "Upcoming bookings", value: upcomingCount ?? upcoming?.length ?? 0, icon: CalendarDays },
-        ].map((s) => (
-          <div key={s.label} className="card-surface p-5">
-            <div className="flex items-center justify-between text-muted">
-              <span className="text-sm font-medium">{s.label}</span>
-              <s.icon className="h-4 w-4" />
-            </div>
-            <p className="mt-3 text-3xl font-bold tabular-nums">{s.value}</p>
-          </div>
-        ))}
-      </section>
+      <DashboardOverviewAnalytics metrics={overview} orderedAt={orderedAt} hasOrderDate={hasOrderDate} asOf={asOf.toISOString()} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="card-surface p-6">

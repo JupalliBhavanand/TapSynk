@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, Building2, CalendarDays, CreditCard, Handshake, Presentation, IdCard, LayoutDashboard, Lock } from "lucide-react";
+import { BarChart3, Bot, Building2, CalendarDays, CreditCard, Handshake, PackageCheck, Presentation, IdCard, LayoutDashboard, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -18,7 +18,7 @@ const items = [
 
 export function DashboardNav({ aiLocked = false, admin = false }: { aiLocked?: boolean; admin?: boolean }) {
   const path = usePathname();
-  const links = admin ? [...items, { href: "/dashboard/demos", label: "Demo requests", icon: Presentation }] : items;
+  const links = admin ? [...items, { href: "/dashboard/fulfillment", label: "Fulfillment", icon: PackageCheck }, { href: "/dashboard/demos", label: "Demo requests", icon: Presentation }] : items;
   return (
     <nav aria-label="Dashboard" className="flex gap-1 overflow-x-auto lg:flex-col">
       {links.map(({ href, label, icon: Icon, ...rest }) => {
