@@ -25,7 +25,7 @@ export function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li><Link href="/privacy" className="hover:text-ink">Privacy</Link></li>
             <li><Link href="/terms" className="hover:text-ink">Terms</Link></li>
-            <li><a href="mailto:hello@tapsync.app" className="hover:text-ink">Contact</a></li>
+            <li><a href="mailto:tapsynkai@gmail.com" className="hover:text-ink">Contact</a></li>
           </ul>
         </div>
       </div>
