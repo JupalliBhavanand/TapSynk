@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, Building2, CalendarDays, CreditCard, Handshake, PackageCheck, Presentation, IdCard, LayoutDashboard, Lock } from "lucide-react";
+import { BarChart3, Bot, Building2, CalendarDays, CreditCard, Handshake, PackageCheck, Presentation, IdCard, LayoutDashboard, Lock, Mail } from "lucide-react";
+import { NotificationBadge, useNotifications } from "@/components/Notifications";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/card", label: "My card", icon: IdCard },
+  { href: "/dashboard/email-signature", label: "Email Signature", icon: Mail },
   { href: "/dashboard/ai", label: "AI agent", icon: Bot, ai: true },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/leads", label: "Leads", icon: Handshake },
@@ -18,6 +20,7 @@ const items = [
 
 export function DashboardNav({ aiLocked = false, admin = false, fulfillmentAdmin = false }: { aiLocked?: boolean; admin?: boolean; fulfillmentAdmin?: boolean }) {
   const path = usePathname();
+  const { counts } = useNotifications();
   const links = [
     ...items,
     ...(fulfillmentAdmin ? [{ href: "/dashboard/fulfillment", label: "Fulfillment", icon: PackageCheck }] : []),
@@ -39,6 +42,7 @@ export function DashboardNav({ aiLocked = false, admin = false, fulfillmentAdmin
           >
             <Icon className="h-4 w-4" />
             {label}
+            <NotificationBadge count={href === "/dashboard/leads" ? counts.leads : href === "/dashboard/appointments" ? counts.appointments : href === "/dashboard/company" ? counts.companyLeads : 0} />
             {ai && aiLocked && <Lock aria-label="AI Card plan" className="ml-auto h-3.5 w-3.5 opacity-60" />}
           </Link>
         );

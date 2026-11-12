@@ -2,8 +2,8 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { ArrowRight, CheckCircle2, Circle, Sparkles } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
-import { EmailSignature } from "@/components/EmailSignature";
 import { UpgradeToAiButton } from "@/components/UpgradeToAiButton";
+import { EmailSignatureOverview } from "@/components/EmailSignatureOverview";
 import { PhysicalCard } from "@/components/PhysicalCard";
 import { DashboardOverviewAnalytics, type OverviewMetricSet } from "@/components/DashboardOverviewAnalytics";
 import { requireDashboardData } from "@/lib/data";
@@ -107,33 +107,36 @@ export default async function DashboardHome() {
       <DashboardOverviewAnalytics metrics={overview} orderedAt={orderedAt} hasOrderDate={hasOrderDate} asOf={asOf.toISOString()} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        <section className="card-surface p-6">
-          <h2 className="font-bold">Your card</h2>
-          {card ? (
-            <div className="mt-5 grid items-center gap-6 sm:grid-cols-[1fr_auto]">
-              <div className="[container-type:inline-size]">
-                <PhysicalCard card={{ ...card, ai: subscription?.tier === "ai" }} />
+        <div className="space-y-6 min-w-0">
+          <section className="card-surface p-6">
+            <h2 className="font-bold">Your card</h2>
+            {card ? (
+              <div className="mt-5 grid items-center gap-6 sm:grid-cols-[1fr_auto]">
+                <div className="[container-type:inline-size]">
+                  <PhysicalCard card={{ ...card, ai: subscription?.tier === "ai" }} />
+                </div>
+                <div className="text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {qr && <img src={qr} alt="QR code for your card" className="mx-auto h-36 w-36 rounded-xl border border-line" />}
+                  <p className="mt-2 text-xs text-muted">Scan to open</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                  <code className="truncate rounded-lg bg-bg px-3 py-2 font-mono text-xs">{link}</code>
+                  <CopyButton value={link} label="Copy link" />
+                  <Link href={`/c/${card.slug}`} target="_blank" className="btn btn-ghost py-2 text-sm">Open</Link>
+                  <Link href="/dashboard/card" className="btn btn-dark py-2 text-sm">Edit card</Link>
+                </div>
+                {!card.published && <p className="text-sm text-stamp sm:col-span-2">Your card is a draft. Publish it to make it live.</p>}
               </div>
-              <div className="text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {qr && <img src={qr} alt="QR code for your card" className="mx-auto h-36 w-36 rounded-xl border border-line" />}
-                <p className="mt-2 text-xs text-muted">Scan to open</p>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
+                <p className="text-muted">You haven't created your card yet.</p>
+                <Link href="/dashboard/card" className="btn btn-primary mt-4">Create my card</Link>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
-                <code className="truncate rounded-lg bg-bg px-3 py-2 font-mono text-xs">{link}</code>
-                <CopyButton value={link} label="Copy link" />
-                <Link href={`/c/${card.slug}`} target="_blank" className="btn btn-ghost py-2 text-sm">Open</Link>
-                <Link href="/dashboard/card" className="btn btn-dark py-2 text-sm">Edit card</Link>
-              </div>
-              {!card.published && <p className="text-sm text-stamp sm:col-span-2">Your card is a draft. Publish it to make it live.</p>}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
-              <p className="text-muted">You haven't created your card yet.</p>
-              <Link href="/dashboard/card" className="btn btn-primary mt-4">Create my card</Link>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+          {card && <EmailSignatureOverview card={card} link={link} />}
+        </div>
 
         <div className="space-y-6">
           <section className="card-surface p-6">
@@ -197,12 +200,6 @@ export default async function DashboardHome() {
           </section>
         </div>
       </div>
-
-      {card && (
-        <div className="mt-6">
-          <EmailSignature card={card} link={link} />
-        </div>
-      )}
     </div>
   );
 }

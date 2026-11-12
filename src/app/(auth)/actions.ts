@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { SITE_URL } from "@/lib/env";
@@ -51,6 +52,9 @@ export async function signup(_: AuthState, form: FormData): Promise<AuthState> {
   if (form.get("company_website")) return { message: "Check your inbox to confirm your email." }; // honeypot
   if (await limited("signup")) return { error: "Too many attempts. Please wait a few minutes and try again." };
 
+  const { data: exists, error: lookupError } = await createAdminClient().rpc("account_email_exists", { candidate: parsed.data.email });
+  if (lookupError) return { error: "Account registration is temporarily unavailable. Please try again shortly." };
+  if (exists) return { error: "Account already exists with this email. Please sign in or reset your password." };
   const supabase = await createClient();
   const next = safeNext(form.get("next"));
   const { data, error } = await supabase.auth.signUp({
@@ -61,7 +65,8 @@ export async function signup(_: AuthState, form: FormData): Promise<AuthState> {
       emailRedirectTo: `${SITE_URL}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: ["user_already_exists", "email_exists"].includes(error.code || "") ? "Account already exists with this email. Please sign in or reset your password." : error.message };
+  if (data.user?.identities?.length === 0) return { error: "Account already exists with this email. Please sign in or reset your password." };
   if (data.session) redirect(next); // email confirmation disabled in Supabase
   return { message: "Almost there! We sent a confirmation link to your email." };
 }

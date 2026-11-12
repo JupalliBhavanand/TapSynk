@@ -23,11 +23,12 @@ export const PLANS: Record<Tier, Plan> = {
       "One-tap “Save contact” for iPhone & Android",
       "QR code backup and shareable link",
       "Edit your details any time",
+      "Professional email signatures linked to your profile",
       "Lead capture: visitors share their contact back",
       "Analytics: views, saves and tap vs QR vs link",
       "Export your leads to CSV",
     ],
-    prices: { month: 20, quarter: 49, year: 149 },
+    prices: { month: 10, quarter: 25, year: 75 },
   },
   ai: {
     tier: "ai",
@@ -42,7 +43,7 @@ export const PLANS: Record<Tier, Plan> = {
       "AI conversation & booking analytics",
       "Priority support",
     ],
-    prices: { month: 49, quarter: 119, year: 399 },
+    prices: { month: 25, quarter: 60, year: 200 },
   },
 };
 

@@ -1,0 +1,96 @@
+.editor { --panel-line: #e3e7ee; color: #1b2538; }
+.gallery, .designPanel, .previewPanel { border: 1px solid var(--panel-line); background: #fff; border-radius: 16px; overflow: hidden; }
+.gallery { padding: 22px; margin-bottom: 22px; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.sectionHeading > div { display: flex; align-items: center; gap: 9px; }
+.sectionHeading h2 { font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.sectionHeading > span { font-size: 10px; color: #8791a1; }
+.step { display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid #e9ecf2; border-radius: 7px; font-size: 9px; color: #8a93a3; }
+.templateGrid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.templateOption { min-width: 0; text-align: left; padding: 9px; border: 1px solid #e8ebf1; border-radius: 12px; cursor: pointer; transition: border-color .25s, transform .25s, box-shadow .25s; }
+.templateOption:hover { border-color: #b8bdd2; transform: translateY(-2px); box-shadow: 0 10px 25px -18px #32426060; }
+.templateOption.selected { border-color: var(--signature-accent); box-shadow: 0 0 0 1px var(--signature-accent); }
+.thumbnail { display: flex; align-items: center; height: 110px; padding: 10px; background: #f3f5f9; border-radius: 8px; overflow: hidden; pointer-events: none; }
+.templateInfo { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 12px 3px 0; }
+.templateInfo small { display: block; font-size: 8px; letter-spacing: .12em; color: #9099a8; margin-bottom: 3px; }
+.templateInfo strong { display: block; font-size: 13px; font-weight: 700; }
+.selectionDot { width: 17px; height: 17px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid #dfe3ec; border-radius: 50%; }
+.selected .selectionDot { background: var(--signature-accent); border-color: var(--signature-accent); color: #fff; }
+.templateOption > p { padding: 7px 3px 4px; font-size: 10px; line-height: 1.6; color: #778397; }
+.workspace { display: grid; grid-template-columns: 250px minmax(0,1fr); gap: 22px; align-items: start; }
+.designPanel { padding: 22px; }
+.controls { display: grid; gap: 17px; min-width: 0; }
+.controls > label { display: flex; flex-direction: column; gap: 8px; font-size: 10px; color: #727d90; font-weight: 600; }
+.controls select, .controls input:not([type=checkbox]):not([type=color]) { width: 100%; padding: 10px 9px; min-width: 0; background: #fbfcfe; border: 1px solid #e2e6ee; border-radius: 7px; font-size: 11px; color: #354158; font-weight: 500; }
+.colorControl { display: flex; align-items: center; gap: 8px; padding: 7px; border: 1px solid #e2e6ee; border-radius: 7px; color: #354158; font-size: 10px; }
+.colorControl input { height: 24px; width: 24px; padding: 0; background: none; border: 0; cursor: pointer; }
+.colorControl button { margin-left: auto; font-size: 8px; text-decoration: underline; color: #7b8596; cursor: pointer; }
+.swatches { display: flex; gap: 9px; margin-top: -7px; }
+.swatches button { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: white; cursor: pointer; border: 2px solid white; outline: 1px solid #e2e6ee; }
+.swatches button[aria-pressed=true] { outline-color: var(--signature-accent); }
+.toggles { display: grid; gap: 15px; padding: 18px 0; border-top: 1px solid #eef0f5; border-bottom: 1px solid #eef0f5; }
+.toggles label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #586478; cursor: pointer; }
+.toggles input { appearance: none; width: 29px; height: 17px; border-radius: 20px; background: #dce1eb; cursor: pointer; position: relative; transition: background .2s; flex-shrink: 0; }
+.toggles input::after { content: ''; position: absolute; width: 11px; height: 11px; top: 3px; left: 3px; background: white; border-radius: 50%; box-shadow: 0 1px 3px #0002; transition: transform .2s; }
+.toggles input:checked { background: var(--signature-accent); }
+.toggles input:checked::after { transform: translateX(12px); }
+.reset, .replay { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; color: #7a8598; cursor: pointer; }
+.reset:hover, .replay:hover { color: #25334a; }
+.saved { font-size: 9px; line-height: 1.7; text-align: center; color: #9ba3b0; margin-top: 16px; }
+.previewPanel { min-width: 0; }
+.previewPanel > .sectionHeading { padding: 22px; margin: 0; }
+.liveDot { width: 6px; height: 6px; border-radius: 50%; background: #3ba984; box-shadow: 0 0 0 4px #e8f5ef; margin-right: 5px; }
+.emailStage { padding: 28px 22px; background: #f2f4f8; border-top: 1px solid #e9edf3; border-bottom: 1px solid #e9edf3; }
+.emailWindow { border-radius: 11px; border: 1px solid #e0e5ee; background: white; box-shadow: 0 14px 35px -25px #283e6750; overflow: hidden; }
+.emailToolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; border-bottom: 1px solid #edf0f5; padding: 13px 17px; font-size: 10px; color: #939cad; background: #fcfdff; }
+.windowDots { display: flex; gap: 4px; }
+.windowDots i { width: 5px; height: 5px; border-radius: 50%; background: #d9dfeb; }
+.emailTo { padding: 13px 20px; font-size: 10px; color: #a1a8b5; border-bottom: 1px solid #f0f2f7; }
+.emailTo span { margin-right: 15px; color: #6b778a; }
+.emailSubject { padding: 13px 20px; font-size: 11px; font-weight: 600; border-bottom: 1px solid #f0f2f7; color: #536078; }
+.emailBody { padding: 22px 20px 28px; }
+.emailBody > p { color: #8b94a5; font-size: 10px; line-height: 1.8; margin-bottom: 14px; }
+.signature { margin-top: 18px; }
+.previewContainer { width: 100%; min-width: 0; }
+.markup { width: 600px; }
+.emailFooter { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 17px; border-top: 1px solid #f0f2f7; font-size: 8px; color: #a1a9b8; }
+.footerPill { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #e6e9f0; border-radius: 99px; padding: 4px 7px; color: #7c8799; }
+.exportBar { padding: 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 17px; }
+.exportBar h3 { font-size: 12px; font-weight: 700; }
+.exportBar p { color: #8590a2; font-size: 10px; line-height: 1.7; margin-top: 5px; max-width: 295px; }
+.copyActions { display: flex; flex-wrap: wrap; gap: 7px; }
+.status { padding: 0 22px 18px; font-size: 11px; color: #657185; }
+.editor :is(button,input,select,a):focus-visible { outline: 2px solid var(--signature-accent); outline-offset: 4px; }
+.templateOption:disabled { opacity: .6; cursor: wait; }
+.reveal { animation: signatureReveal .65s cubic-bezier(.2,.8,.2,1) both; }
+.reveal [data-signature-part=logo] { animation: logoReveal .9s .1s both; }
+.float [data-signature-part=portrait] { animation: portraitFloat 5s ease-in-out infinite; }
+.float [data-signature-part=logo] { animation: logoReveal .9s both; }
+.signature [data-signature-part=portrait] { transition: transform .45s; }
+.signature:not(.none):hover [data-signature-part=portrait] { transform: translateY(-3px); }
+.studio [data-signature-part=portrait] { position: relative; }
+@keyframes signatureReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes logoReveal { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes portraitFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (min-width: 1600px) { .workspace { grid-template-columns: 290px minmax(0,1fr); } .emailStage { padding: 35px; } .thumbnail { height: 140px; } }
+@media (max-width: 1100px) { .templateGrid { grid-template-columns: repeat(2,minmax(0,1fr)); } .thumbnail { height: 130px; } .workspace { grid-template-columns: 220px minmax(0,1fr); gap: 16px; } .designPanel { padding: 18px; } .emailStage { padding: 20px 12px; } .emailBody { padding: 20px 13px; } }
+@media (max-width: 800px) { .workspace { grid-template-columns: 1fr; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; } .controls > label:first-of-type, .swatches, .toggles, .reset { grid-column: 1 / -1; } .toggles { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; } .toggles label { flex-direction: column; align-items: flex-start; } .saved { text-align: left; } .emailStage { padding: 26px; } }
+@media (max-width: 480px) { .gallery { padding: 16px; } .templateGrid { gap: 9px; } .thumbnail { height: 95px; padding: 5px; } .templateOption > p { font-size: 8px; } .sectionHeading > span { display: none; } .emailStage { padding: 18px 10px; } .emailFooter > span:last-child { display: none; } .previewPanel > .sectionHeading { padding: 18px; } .exportBar { padding: 18px; } }
+@media (prefers-reduced-motion: reduce) { .editor *, .editor *::after { animation: none !important; transition: none !important; } .templateOption:hover, .signature:hover [data-signature-part=portrait] { transform: none !important; } }
+
+@media (prefers-reduced-motion: reduce) { .signature [data-signature-part=motion] { display: none !important; } }
+
+@media (prefers-reduced-motion: reduce) { .signature, .signature * { animation: none !important; transition: none !important; } .signature:hover [data-signature-part=portrait] { transform: none !important; } }
+
+/* Soft paper and lilac details echo the signature collection. */
+.editor { --panel-line: #e5dce9; }
+.thumbnail { background: #f2eaf4; height: 125px; }
+.emailStage { background: #f0e9f3; border-color: #e6ddeb; }
+.step { background: #f5eff7; border-color: #e6dceb; color: #7c668b; }
+.templateOption.selected { background: #fcf9fd; }
+
+.emailInstructions { margin: 0 22px 20px; padding: 16px; border: 1px solid #e6dceb; border-radius: 10px; background: #faf7fc; font-size: 11px; line-height: 1.8; color: #665471; }
+.emailInstructions h3 { font-size: 12px; color: #33283c; font-weight: 700; margin-bottom: 8px; }
+.emailInstructions ol { list-style: decimal; padding-left: 18px; }
+.emailInstructions li { margin-bottom: 5px; }
+.emailInstructions p { margin-top: 10px; font-size: 10px; color: #897891; }

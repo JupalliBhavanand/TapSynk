@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { sendOwnerNotificationForEntity } from "@/lib/notification-mail";
 import { getPublicCard } from "@/lib/data";
 import { REQUIRE_SUBSCRIPTION } from "@/lib/env";
 import { rateLimit } from "@/lib/rate-limit";
@@ -42,10 +43,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/leads/[
   const lead = { name, email, phone, company, message };
   const { card } = found;
   const admin = createAdminClient();
-  const { error } = await admin.from("leads").insert({ ...lead, card_id: card.id, owner_id: card.user_id, company_id: card.company_id });
+  const { data: saved, error } = await admin.from("leads").insert({ ...lead, card_id: card.id, owner_id: card.user_id, company_id: card.company_id }).select("id").single();
   if (error) return NextResponse.json({ error: "Could not send your details. Please try again." }, { status: 500 });
   after(async () => {
-    await admin.rpc("bump_card_stat", { p_slug: slug, p_kind: "lead", p_source: parseSource(source) });
+    await Promise.allSettled([
+      admin.rpc("bump_card_stat", { p_slug: slug, p_kind: "lead", p_source: parseSource(source) }),
+      ...(saved ? [sendOwnerNotificationForEntity("lead", saved.id)] : []),
+    ]);
   });
   return NextResponse.json({ ok: true });
 }

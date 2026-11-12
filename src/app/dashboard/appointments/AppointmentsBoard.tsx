@@ -1,11 +1,13 @@
 "use client";
 
+import { Pagination, usePagination } from "@/components/Pagination";
 import { useMemo, useState } from "react";
 import { ArrowDownUp, CalendarCheck, CalendarDays, CalendarRange, CheckCircle2, Clock, Mail, Phone, XCircle } from "lucide-react";
 import { Chips, ListSkeleton, matches, NoMatches, SearchBox, Select, useHydrated } from "@/components/ListToolbar";
 import { formatInZone } from "@/lib/slots";
 import type { Appointment } from "@/lib/types";
 import { cn, initials } from "@/lib/utils";
+import { AppointmentCalendar } from "./CalendarConnection";
 import { AppointmentActions } from "./AppointmentActions";
 
 type View = "upcoming" | "confirmed" | "completed" | "cancelled" | "all";
@@ -24,7 +26,7 @@ function dayKey(iso: string | number, tz: string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
-export function AppointmentsBoard({ items, tz }: { items: Appointment[]; tz: string }) {
+export function AppointmentsBoard({ items, tz, googleEmail, calendarConnected }: { items: Appointment[]; tz: string; googleEmail?: string | null; calendarConnected?: boolean }) {
   const hydrated = useHydrated();
   const [now] = useState(() => Date.now());
   const [query, setQuery] = useState("");
@@ -70,6 +72,8 @@ export function AppointmentsBoard({ items, tz }: { items: Appointment[]; tz: str
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isUpcoming only reads `now`
   }, [items, view, range, query, sort, now, tz]);
 
+  const pagination = usePagination(shown, [query, view, range, sort].join("|"));
+
   const today = dayKey(now, tz);
   const tomorrow = dayKey(now + DAY, tz);
   const dayTitle = (iso: string) => {
@@ -79,7 +83,7 @@ export function AppointmentsBoard({ items, tz }: { items: Appointment[]; tz: str
     return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(iso));
   };
   const groups: { title: string; items: Appointment[] }[] = [];
-  for (const a of shown) {
+  for (const a of pagination.items) {
     const title = sort === "soonest" || sort === "latest" ? dayTitle(a.starts_at) : "";
     const last = groups[groups.length - 1];
     if (last && last.title === title) last.items.push(a);
@@ -188,16 +192,18 @@ export function AppointmentsBoard({ items, tz }: { items: Appointment[]; tz: str
                         <a href={`mailto:${a.email}`} className="flex min-w-0 items-center gap-1 hover:text-ink"><Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{a.email}</span></a>
                         {a.phone && <a href={`tel:${a.phone.replace(/[^\d+]/g, "")}`} className="flex items-center gap-1 hover:text-ink"><Phone className="h-3.5 w-3.5" /> {a.phone}</a>}
                       </div>
+                      <AppointmentCalendar id={a.id} calendarConnected={calendarConnected} syncStatus={a.calendar_sync_status} error={a.calendar_sync_error} />
                       {a.notes && <p className="mt-2 rounded-xl bg-bg px-3 py-2 text-sm text-ink-2">“{a.notes}”</p>}
                     </div>
                   </div>
-                  <AppointmentActions id={a.id} status={a.status} emailStatus={a.confirmation_email_status} />
+                  <AppointmentActions id={a.id} status={a.status} emailStatus={a.confirmation_email_status} meetUrl={a.google_meet_url} accountEmail={googleEmail} calendarConnected={calendarConnected} />
                 </li>
               ))}
             </ul>
           </section>
         ))
       )}
+      {hydrated && <Pagination {...pagination.props} />}
     </div>
   );
 }

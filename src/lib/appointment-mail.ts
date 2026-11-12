@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type Confirmation = { id: string; name: string; email: string; starts_at: string; ends_at: string; notes: string; host: string; business: string; timezone: string; replyTo?: string };
+export type Confirmation = { id: string; name: string; email: string; starts_at: string; ends_at: string; notes: string; host: string; business: string; timezone: string; replyTo?: string; meetUrl?: string };
 const escape = (text: string) => text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 
 export function gmailConfigurationError(): string | undefined {
@@ -68,8 +68,8 @@ export function mailFailure(error: unknown) {
 export function confirmationMessage(booking: Confirmation) {
   const when = new Intl.DateTimeFormat("en-US", { timeZone: booking.timezone, dateStyle: "full", timeStyle: "short" }).format(new Date(booking.starts_at));
   const duration = Math.round((Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 60000);
-  const lines = [`Hello ${booking.name},`, "Your appointment is confirmed.", `Business: ${booking.business}`, `With: ${booking.host}`, `Date and time: ${when}`, `Timezone: ${booking.timezone}`, `Duration: ${duration} minutes`, ...(booking.notes ? [`Purpose: ${booking.notes}`] : []), ...(booking.replyTo ? ["To ask a question or request a change, reply to this email."] : []), "Thank you for booking through TapSynk."];
-  return { subject: "Appointment confirmation", text: lines.join("\n\n"), html: `<h1>Appointment confirmation</h1>${lines.map((line) => `<p>${escape(line)}</p>`).join("")}` };
+  const lines = [`Hello ${booking.name},`, "Your appointment is confirmed.", `Business: ${booking.business}`, `With: ${booking.host}`, `Date and time: ${when}`, `Timezone: ${booking.timezone}`, `Duration: ${duration} minutes`, ...(booking.meetUrl && /^https:\/\/meet\.google\.com\//.test(booking.meetUrl) ? [`Join Google Meet: ${booking.meetUrl}`] : []), ...(booking.notes ? [`Purpose: ${booking.notes}`] : []), ...(booking.replyTo ? ["To ask a question or request a change, reply to this email."] : []), "Thank you for booking through TapSynk."];
+  return { subject: "Appointment confirmation", text: lines.join("\n\n"), html: `<h1>Appointment confirmation</h1>${lines.map((line) => `<p>${line.startsWith("Join Google Meet: ") ? `<a href="${escape(line.slice(18))}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:white;text-decoration:none;border-radius:8px">Join Google Meet</a>` : escape(line)}</p>`).join("")}` };
 }
 
 /** Provider acceptance is tracked independently of the confirmed appointment. */

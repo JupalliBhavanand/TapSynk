@@ -42,7 +42,7 @@ export async function emailBookingConfirmation(id: string) {
     const english = await englishBookingDetails(booking);
     const { error: updateError } = await supabase.from("appointments").update({ ...english, booking_language: "en", confirmation_email_status: "pending" }).eq("id", id).eq("owner_id", user.id).in("confirmation_email_status", ["not_requested", "pending", "failed"]);
     if (updateError) return { error: "Could not queue email. Apply database migration 0005 first." };
-    const result = await sendAppointmentConfirmation({ ...booking, ...english, host: card.full_name, business: agent.business_name || card.company || card.full_name, timezone: agent.timezone, replyTo: card.email || undefined });
+    const result = await sendAppointmentConfirmation({ ...booking, ...english, host: card.full_name, business: agent.business_name || card.company || card.full_name, timezone: agent.timezone, replyTo: card.email || undefined, meetUrl: booking.google_meet_url || undefined });
     revalidatePath("/dashboard/appointments");
     return result.sent ? { message: "Confirmation email accepted by the company email provider." } : { error: result.reason };
   } catch { return { error: "Could not prepare the confirmation email. Please try again." }; }

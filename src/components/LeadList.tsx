@@ -1,5 +1,8 @@
 "use client";
 
+import { GoogleMeetButton } from "@/components/GoogleMeetButton";
+import type { LeadMeeting } from "@/lib/google-links";
+import { Pagination, usePagination } from "@/components/Pagination";
 import { useMemo, useState, useTransition } from "react";
 import { ArrowDownUp, CalendarRange, Check, ContactRound, Mail, MessageCircle, Phone, StickyNote, Trophy, UserRound, Users } from "lucide-react";
 import { Chips, ListSkeleton, matches, NoMatches, SearchBox, Select, useHydrated } from "@/components/ListToolbar";
@@ -63,7 +66,7 @@ function downloadVcard(l: Lead) {
   URL.revokeObjectURL(url);
 }
 
-export function LeadList({ leads, empty, cardNames }: { leads: Lead[]; empty: string; cardNames?: Record<string, string> }) {
+export function LeadList({ leads, empty, cardNames, leadMeetings = {}, googleEmail }: { leads: Lead[]; empty: string; cardNames?: Record<string, string>; leadMeetings?: Record<string, LeadMeeting>; googleEmail?: string | null }) {
   const hydrated = useHydrated();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -99,6 +102,8 @@ export function LeadList({ leads, empty, cardNames }: { leads: Lead[]; empty: st
     return list.sort(by[sort]);
   }, [leads, status, card, range, query, sort, now, cardNames]);
 
+  const pagination = usePagination(shown, [query, status, range, sort, card].join("|"));
+
   if (leads.length === 0) {
     return (
       <div className="card-surface mt-8 flex flex-col items-center p-12 text-center">
@@ -124,7 +129,7 @@ export function LeadList({ leads, empty, cardNames }: { leads: Lead[]; empty: st
 
   // Group by day when sorted by date, by status when sorted by status.
   const groups: { title: string; items: Lead[] }[] = [];
-  for (const l of shown) {
+  for (const l of pagination.items) {
     const title = sort === "newest" || sort === "oldest" ? bucket(l.created_at, now) : sort === "status" ? LEAD_STATUS[l.status].label : "";
     const last = groups[groups.length - 1];
     if (last && last.title === title) last.items.push(l);
@@ -217,18 +222,19 @@ export function LeadList({ leads, empty, cardNames }: { leads: Lead[]; empty: st
               )}
               <ul className="card-surface divide-y divide-line overflow-hidden">
                 {g.items.map((l) => (
-                  <LeadRow key={l.id} lead={l} now={now} via={cardNames?.[l.card_id]} />
+                  <LeadRow key={l.id} lead={l} now={now} via={cardNames?.[l.card_id]} meeting={leadMeetings[l.id]} googleEmail={googleEmail} />
                 ))}
               </ul>
             </section>
           ))}
         </>
       )}
+      {hydrated && <Pagination {...pagination.props} />}
     </div>
   );
 }
 
-function LeadRow({ lead: l, now, via }: { lead: Lead; now: number; via?: string }) {
+function LeadRow({ lead: l, now, via, meeting, googleEmail }: { lead: Lead; now: number; via?: string; meeting?: LeadMeeting; googleEmail?: string | null }) {
   const [open, setOpen] = useState(false);
   const color = AVATAR[[...l.id].reduce((n, c) => n + c.charCodeAt(0), 0) % AVATAR.length];
   const wa = l.phone.replace(/[^\d]/g, "");
@@ -272,6 +278,7 @@ function LeadRow({ lead: l, now, via }: { lead: Lead; now: number; via?: string 
               <StickyNote className="h-3.5 w-3.5" /> {l.notes ? "Note" : "Add note"}
             </button>
           </div>
+          {meeting && <div className="mt-3"><GoogleMeetButton id={meeting.id} meetUrl={meeting.google_meet_url} accountEmail={googleEmail} status={meeting.status} /></div>}
           {l.notes && !open && <p className="mt-2 whitespace-pre-line border-l-2 border-cream-line pl-3 text-sm text-ink-2">{l.notes}</p>}
           {open && <NoteEditor id={l.id} initial={l.notes ?? ""} onDone={() => setOpen(false)} />}
         </div>

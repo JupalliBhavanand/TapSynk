@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ArrowRightLeft, BarChart3, Bot, Building2, CalendarCheck, CalendarDays, Check, Gift, Globe, Handshake, Lock, Mic, Minus, MousePointer2, QrCode, ShieldCheck, Smartphone, Sparkles, UserPlus, Zap } from "lucide-react";
+import { ProductVoiceTour } from "@/components/ProductVoiceTour";
+import { SignatureFeature } from "@/components/SignatureFeature";
 import { CardPrinter } from "@/components/CardPrinter";
 import { HeroDemo } from "@/components/HeroDemo";
 import { CompanyPricing } from "@/components/CompanyPricing";
@@ -10,6 +12,7 @@ import { SITE_URL } from "@/lib/env";
 import { PLANS } from "@/lib/plans";
 
 const faqs = [
+  { q: "Can I add my TapSynk profile to my email signature?", a: "Yes. Every card includes a customizable email signature. Choose a professional template, add your branding, and copy it into your email settings. Clicking the signature opens your TapSynk profile. Animated accents can be turned off." },
   {
     q: "Is there a free trial?",
     a: "Yes, on the Virtual Card. It costs $0 for the first 30 days and your smart card still ships free. After that the plan's price starts automatically, and you can cancel any time in the first month without being charged. The AI Card is billed from day one, and you can switch between the two whenever you like.",
@@ -88,7 +91,7 @@ export default function HomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       {/* ───── hero ───── */}
-      <section className="grid-bg relative overflow-hidden">
+      <section id="product-intro" className="grid-bg relative scroll-mt-20 overflow-hidden">
         <div className="pointer-events-none absolute -top-40 left-1/2 h-[36rem] w-[60rem] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(29,91,255,0.16),transparent)]" />
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-20 pt-14 lg:grid-cols-[1.1fr_1fr] lg:pt-20">
           <div className="fade-up">
@@ -112,6 +115,7 @@ export default function HomePage() {
                 <CalendarDays className="h-4 w-4" /> Book a free demo
               </Link>
             </div>
+            <ProductVoiceTour />
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
               <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-success" /> Secure Stripe checkout</span>
               <span className="flex items-center gap-1.5"><Zap className="h-4 w-4 text-brand" /> Live in 3 minutes</span>
@@ -174,6 +178,8 @@ export default function HomePage() {
           </Reveal>
         </div>
       </section>
+
+      <SignatureFeature />
 
       {/* ───── AI section ───── */}
       <section id="ai" className="relative scroll-mt-16 overflow-hidden bg-navy py-24 text-white">

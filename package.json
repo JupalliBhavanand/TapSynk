@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/test-ai-voice.mjs && node scripts/test-booking-confirmation.mjs && node scripts/test-smooth-voice.mjs && node scripts/test-streaming-audio.mjs && node scripts/test-voice-chat.mjs && node scripts/test-vcard.mjs && node scripts/test-payment-mail.mjs"
+    "test": "node scripts/test-ai-voice.mjs && node scripts/test-booking-confirmation.mjs && node scripts/test-smooth-voice.mjs && node scripts/test-streaming-audio.mjs && node scripts/test-voice-chat.mjs && node scripts/test-vcard.mjs && node scripts/test-payment-mail.mjs && node scripts/test-email-signature.mjs && node scripts/test-product-updates.mjs && node scripts/test-notifications.mjs && node scripts/test-google-links.mjs && node scripts/test-calendar-all.mjs && node scripts/test-meeting-delivery.mjs && node scripts/test-signature-export.mjs && node scripts/test-signature-portrait.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.27.0",
@@ -21,7 +21,8 @@
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "stripe": "^23.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

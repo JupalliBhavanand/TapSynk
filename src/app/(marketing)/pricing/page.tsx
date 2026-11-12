@@ -4,7 +4,7 @@ import { PricingTable } from "@/components/PricingTable";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "TapSynk plans: Virtual Card from $20/month with the first month free, and AI Card from $49/month. Company plans with team discounts. Every plan includes a premium smart card shipped free.",
+  description: "TapSynk plans: Virtual Card from $10/month with the first month free, and AI Card from $25/month. Company plans with team discounts. Every plan includes a premium smart card shipped free.",
   alternates: { canonical: "/pricing" },
 };
 

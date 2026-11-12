@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+import { syncAppointmentToGoogle } from "@/lib/google-calendar";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getUser } from "@/lib/supabase/server";
@@ -111,9 +113,10 @@ export async function saveAgent(input: AgentInput): Promise<Result<{ agent: Agen
 export async function setAppointmentStatus(id: string, status: "cancelled" | "completed" | "confirmed"): Promise<Result> {
   const { supabase, user } = await getUser();
   if (!user) return { ok: false, error: "Please sign in again." };
-  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Unknown appointment." };
+  if (!z.string().uuid().safeParse(id).success || !["confirmed", "completed", "cancelled"].includes(status)) return { ok: false, error: "Unknown appointment." };
   const { error } = await supabase.from("appointments").update({ status }).eq("id", id).eq("owner_id", user.id);
   if (error) return { ok: false, error: error.code === "23505" ? "That time has been booked again." : "Could not update the appointment." };
+  after(async () => { await syncAppointmentToGoogle(id, user.id); });
   revalidatePath("/dashboard/appointments");
   revalidatePath("/dashboard");
   return { ok: true };

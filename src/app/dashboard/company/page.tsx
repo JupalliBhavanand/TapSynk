@@ -33,6 +33,11 @@ export default async function CompanyPage({ searchParams }: PageProps<"/dashboar
 
   const full = cards.length >= company.seats;
   const ranked = [...cards].sort((a, b) => (perCard[b.id]?.view ?? 0) - (perCard[a.id]?.view ?? 0));
+  const size = 20;
+  const pages = Math.max(1, Math.ceil(ranked.length / size));
+  const requested = typeof sp.page === "string" && /^\d+$/.test(sp.page) ? Number(sp.page) : 1;
+  const page = Math.max(1, Math.min(pages, requested));
+  const visibleCards = ranked.slice((page - 1) * size, page * size);
   const topId = ranked[0] && (perCard[ranked[0].id]?.view ?? 0) > 0 ? ranked[0].id : null;
 
   return (
@@ -73,7 +78,7 @@ export default async function CompanyPage({ searchParams }: PageProps<"/dashboar
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {ranked.map((c) => {
+                {visibleCards.map((c) => {
                   const t = perCard[c.id] ?? emptyTotals();
                   return (
                     <tr key={c.id}>
@@ -114,6 +119,7 @@ export default async function CompanyPage({ searchParams }: PageProps<"/dashboar
             </table>
           </div>
         )}
+        {pages > 1 && <nav aria-label="Company pagination" className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs"><span className="text-muted">{(page - 1) * size + 1}–{Math.min(page * size, ranked.length)} of {ranked.length} employees</span><div className="flex items-center gap-3">{page > 1 && <Link href={`/dashboard/company?page=${page - 1}`} className="btn btn-ghost py-2 text-xs">Previous</Link>}<span>Page {page} of {pages}</span>{page < pages && <Link href={`/dashboard/company?page=${page + 1}`} className="btn btn-ghost py-2 text-xs">Next</Link>}</div></nav>}
       </section>
 
       <CompanySetup initial={company} userId={user.id} profileOnly />

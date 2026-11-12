@@ -1,0 +1,42 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import sharp from 'sharp';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+let signedIn=false, limited=false, uploads=[];
+const storage={upload:async(path,bytes,options)=>{uploads.push({path,bytes,options});return {error:null}},getPublicUrl:path=>({data:{publicUrl:'https://storage.example/'+path}})};
+const imports={'node:crypto':{createHash},sharp,'@/lib/supabase/server':{getUser:async()=>({user:signedIn?{id:'owner'}:null,supabase:{storage:{from:name=>{assert.equal(name,'card-assets');return storage}}}})},'@/lib/rate-limit':{rateLimit:async()=>!limited}};
+const loadedModule={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/app/api/signature-export/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText,{module: loadedModule,exports:loadedModule.exports,require:name=>imports[name],Response,File,Buffer});
+const {POST}=loadedModule.exports;
+assert.equal((await POST(new Request('https://app.example',{method:'POST'}))).status,401);
+signedIn=true;
+const request=async bytes=>{const form=new FormData();form.set('image',new Blob([bytes],{type:'image/png'}),'signature.png');return POST(new Request('https://app.example',{method:'POST',body:form}));};
+assert.equal((await request('invalid')).status,400);
+assert.equal(uploads.length,0);
+const png=await sharp({create:{width:1200,height:640,channels:4,background:'#665080'}}).png().toBuffer();
+const response=await request(png);assert.equal(response.status,200);const result=await response.json();assert.ok(result.url.startsWith('https://storage.example/owner/signature-'));assert.equal(uploads.length,1);assert.equal(uploads[0].options.contentType,'image/png');
+for (const width of [880,760]) {
+ const resized=await sharp(png).resize({width}).png().toBuffer();
+ assert.equal((await request(resized)).status,200,'Accept email-sized high-resolution image');
+}
+limited=true;assert.equal((await request(png)).status,429);
+console.log('Signature export: authentication, invalid PNG rejection, owner-scoped storage, public image URL, and rate limiting passed.');
+
+limited=false;
+const assetForm=new FormData();assetForm.set('kind','assets');
+const small=await sharp({create:{width:16,height:16,channels:4,background:'#665080'}}).png().toBuffer();
+assetForm.set('asset-1',new Blob([small],{type:'image/png'}),'icon.png');
+assetForm.set('asset-0',new Blob([png],{type:'image/png'}),'portrait.png');
+const batchResponse=await POST(new Request('https://app.example',{method:'POST',body:assetForm}));
+assert.equal(batchResponse.status,200);
+const batch=await batchResponse.json();assert.equal(batch.urls.length,2);
+assert.ok(batch.urls.every(url=>url.startsWith('https://storage.example/owner/signature-asset-')));
+assert.equal((await sharp(uploads.at(-2).bytes).metadata()).width,1200,'Return hosted URLs in input index order');
+assert.equal((await sharp(uploads.at(-1).bytes).metadata()).width,16,'Small icons are accepted for email');
+const bad=new FormData();bad.set('kind','assets');bad.set('asset-0',new Blob(['not-image'],{type:'image/png'}),'bad.png');
+const before=uploads.length;
+assert.equal((await POST(new Request('https://app.example',{method:'POST',body:bad}))).status,400);
+assert.equal(uploads.length,before,'Invalid batch writes no assets');
+console.log('Email assets: small icons, public portrait URLs, ordered batch output, and rejection before upload passed.');

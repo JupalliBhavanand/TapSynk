@@ -11,7 +11,8 @@ import { getUser } from "@/lib/supabase/server";
 import { hasAi } from "@/lib/types";
 import { clientIp } from "@/lib/utils";
 import { speakToken } from "@/lib/voice";
-import { sendAppointmentConfirmation, type Confirmation } from "@/lib/appointment-mail";
+import { deliverBookedMeeting } from "@/lib/booking-delivery";
+import { type Confirmation } from "@/lib/appointment-mail";
 import { canBookAppointment } from "@/lib/booking-quota";
 import { prepareReplyAudio } from "@/lib/reply-audio";
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/chat/[s
     after(async () => {
       await Promise.allSettled([
         ...(voicePreparation ? [voicePreparation] : []),
-        ...confirmations.map((booking) => sendAppointmentConfirmation(booking)),
+        ...confirmations.map(booking => deliverBookedMeeting(booking, card.user_id)),
       ]);
     });
     const prepareVoice = (reply: string) => {

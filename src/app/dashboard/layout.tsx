@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { NotificationProvider, NotificationBell } from "@/components/Notifications";
+import { notificationSnapshot } from "@/lib/notifications";
 import { DashboardNav } from "@/components/DashboardNav";
 import { Logo } from "@/components/Logo";
 import { getDashboardData } from "@/lib/data";
@@ -13,13 +15,16 @@ export const metadata: Metadata = { title: "Dashboard", robots: { index: false, 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const data = await getDashboardData();
   if (!data) redirect("/login?next=/dashboard");
+  const notifications = await notificationSnapshot(data.user.id);
   const active = isActive(data.subscription);
 
   return (
+    <NotificationProvider key={data.user.id} userId={data.user.id} initial={notifications}>
     <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
       <aside className="sticky top-0 z-30 border-b border-line bg-bg/90 px-4 py-4 backdrop-blur lg:h-dvh lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
-        <div className="flex items-center justify-between lg:block">
+        <div className="flex items-center justify-between gap-3">
           <Logo href="/dashboard" />
+          <NotificationBell />
           <form action="/auth/signout" method="post" className="lg:hidden">
             <button className="btn btn-ghost px-3 py-2 text-sm" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
           </form>
@@ -43,5 +48,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       </aside>
       <main className="px-4 py-8 sm:px-8 lg:px-12 lg:py-10">{children}</main>
     </div>
+    </NotificationProvider>
   );
 }

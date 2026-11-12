@@ -557,3 +557,9 @@ body {
   transform: scale(calc(1 + var(--level, 0) * 0.22));
   transition: transform 90ms linear;
 }
+
+
+
+@keyframes notification-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.notification-toast { animation: notification-enter .3s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .notification-toast { animation: none; } }

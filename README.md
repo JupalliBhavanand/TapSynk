@@ -27,11 +27,11 @@ Built with **Next.js 16 (App Router) · Supabase (auth, Postgres, storage) · St
 | Database schema, row-level security, storage bucket | `supabase/migrations/0001_init.sql`, `0002_trial_leads_companies.sql`, `0003_plan_switch_demos_lead_notes.sql`, `0004_ai_voice.sql` |
 | **All prices** | `src/lib/plans.ts` (one file) |
 
-Plans: **Virtual Card** $20/month · $49/3 months · $149/year, **AI Card** $49/month · $119/3 months · $399/year. Every plan includes a physical NFC card shipped to the address entered at checkout.
+Plans: **Virtual Card** $10/month · $25/3 months · $75/year, **AI Card** $25/month · $60/3 months · $200/year. Every plan includes a physical NFC card shipped to the address entered at checkout.
 
 **First month free on the Virtual Card**: an account's first Virtual Card plan starts with a 30-day trial ($0 today, card required). AI Card plans are charged from day one, and upgrading from a Virtual trial to AI ends the trial and charges AI right away. Stripe charges the chosen plan when the trial ends; if no payment method is on file the subscription cancels. One free month per account (`profiles.trial_used_at`).
 
-**Company plans** (monthly only, no free month): $20 (Virtual) or $49 (AI) per employee card, 2 to 500 cards, with a team discount of 10% for 2–9 cards, 15% for 10–24 and 20% for 25+. Change the numbers in `COMPANY_DISCOUNTS` in `src/lib/plans.ts`. Seat changes are prorated on the next bill.
+**Company plans** (monthly only, no free month): $10 (Virtual) or $25 (AI) per employee card, 2 to 500 cards, with a team discount of 10% for 2–9 cards, 15% for 10–24 and 20% for 25+. Change the numbers in `COMPANY_DISCOUNTS` in `src/lib/plans.ts`. Seat changes are prorated on the next bill.
 
 ## Setup (about 15 minutes)
 
@@ -135,3 +135,96 @@ A service-only delivery table claims each invoice so concurrent and replayed web
 Replies now stream 24 kHz PCM directly into Web Audio rather than waiting for a complete audio download. Greetings and replies share the same configured voice and delivery instructions. The default speech model is `gemini-3.8-flash-lite-tts`; an explicit `GEMINI_TTS_MODEL` overrides it. Cached replays use WAV audio. Playback cancellation stops queued audio, and the microphone resumes after actual playback ends.
 
 Run `npm test`, `npm run lint`, and `npm run build` before deployment. `node --env-file=.env scripts/smoke-website.mjs` checks a production server at port 3100 in desktop and mobile Edge; it requires Playwright (override `PLAYWRIGHT_PATH` on another machine). `node --env-file=.env scripts/benchmark-ai-voice.mjs --live` makes billable speech requests and writes first-audio timing measurements. Provider timing excludes transcription, reply generation, network playback and device delays. Actual iPhone/Android microphone and multilingual pronunciation still need device verification.
+
+
+### Email signatures, narration, and Google Calendar
+
+Email Signature has its own dashboard section and a clickable overview below Your card.
+Templates share their preview and export markup; clicking the entire signature opens its owner's
+TapSynk profile. The animation control also enables/disables a small hosted GIF accent in copied
+emails (some clients display only the first frame). Design choices are stored per profile in this
+browser. The homepage includes an opt-in narrated product tour using an upbeat Puck studio voice,
+with a stop button and visible transcript. Device speech is a fallback if studio audio is unavailable.
+Narration scrolls to the current section without adding an outline. No sound plays automatically.
+
+Apply `supabase/migrations/0007_calendar_and_signup.sql` before deploying. It adds the
+server-only account-email lookup (including unconfirmed accounts), encrypted Google connection
+storage, and appointment sync fields. Existing signup rate limits remain in place.
+
+To enable Google Calendar:
+
+1. Enable **Google Calendar API** in your Google Cloud project and configure its OAuth consent screen.
+2. Create a **Web application** OAuth client. Add the exact authorized redirect URI:
+   `https://YOUR-DOMAIN/api/google-calendar/callback` (or `http://localhost:3000/api/google-calendar/callback` locally).
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALENDAR_TOKEN_KEY` on the server.
+   Generate the last value once with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
+   Keep this key stable: rotating it requires calendar owners to reconnect. Never prefix secrets with `NEXT_PUBLIC_`.
+4. Ensure `NEXT_PUBLIC_SITE_URL` matches the redirect origin. Add Google test users while the OAuth app
+   is in Testing, or publish/verify the consent screen as required by Google. Testing-mode grants may expire.
+5. In **Appointments**, choose **Connect Google Calendar** and approve calendar access. After consent, the Appointments page runs **Sync all meetings** in automatic batches of five.
+   Keep the page open until progress completes. Past, upcoming, and completed appointments are included.
+
+Sync is one-way from TapSynk to the connected account's primary Google Calendar. Confirmed bookings
+create Calendar invitations and request Google Meet conferences. New bookings sync in a Next.js `after`
+job; failures are visible and retryable. Event IDs are deterministic to prevent duplicate invitations.
+Cancellation and time changes are queued by a database trigger; status changes in the app sync automatically.
+Reopening a cancelled booking creates a new event. Google Meet must be enabled for the connected Google
+account; the app never invents a meeting URL. **Join Google Meet** opens the saved conference directly.
+Google events do not change TapSynk's availability and editing an event in Google does not update TapSynk.
+Disconnect removes local credentials and attempts Google revocation; existing events remain in Google.
+OAuth consent explicitly explains that booking information is shared with Google and invited guests.
+
+The new plan prices apply to new checkouts and plan changes. Existing Stripe subscriptions retain their
+current Stripe price until changed; historical payments and receipts are not rewritten.
+
+
+### Owner alerts and personal Calendar / Meet linking
+
+Apply `supabase/migrations/0008_owner_notifications.sql` after migration 0007. New leads and
+appointments create a persistent notification and owner email job in the same database transaction.
+Owners see a bell inbox, numbered Leads / Appointments / Company navigation badges, and dismissible
+popups. Counts track unread notifications, not the total number of records. Use **Read all** or open a
+notification to acknowledge it. Notifications use Supabase Realtime with a 15-second visible-tab polling
+fallback; read status follows the account across devices. Historical records are not emailed or backfilled.
+
+Email alerts go to the TapSynk account owner's auth email, including company-card activity. They use
+the platform's existing company SMTP/Gmail configuration; visitors are never emailed as the owner.
+Normal lead / booking routes dispatch emails after saving. Dashboard polling recovers pending jobs.
+SMTP acceptance is tracked with an atomic claim to prevent duplicate alerts. Ambiguous failures and
+abandoned sends require inbox review and explicit retry from the bell inbox. Pending jobs remain queued
+while SMTP is unconfigured. For guaranteed off-session recovery after a server interruption, a deployment
+worker should regularly call `sendPendingOwnerNotifications` for owners with pending jobs; normal
+request-based `after` dispatch does not depend on the owner being logged in.
+
+Each user chooses **Link your Google account** in Appointments and signs in to their own account.
+The connected Google email is shown after consent. Calendar invitations and Meet links belong to this
+same Google account; no separate Meet password or application credentials are requested from the user.
+**Automatic Google Meet** can be disabled per account for new events; existing links remain available.
+The site operator configures the OAuth client once; users only grant consent. Reconnect older accounts
+to grant the optional Google email scope and show their linked identity.
+
+The homepage studio voice uses the existing `GEMINI_API_KEY` and `GEMINI_TTS_MODEL` with a separate
+`PRODUCT_TOUR_VOICE` (default `Puck`). AI-assistant voices remain unchanged. Only fixed chapter scripts
+are accepted by the public audio route; renders are deduplicated, cached, and rate-limited. To require a
+specific voice, set `PRODUCT_TOUR_VOICE` before deploying and update the tour version when changing it.
+
+
+Appointments and Leads (including company leads) have **Google Calendar** and **Google Meet** shortcuts
+at the top. Calendar opens the real Google Calendar with its events; Meet opens the account's meeting
+homepage. Links include the connected Google email as an account-selection hint. Google may still ask
+the user to sign in or choose that account when multiple browser accounts are active.
+Each appointment shows **Join Google Meet** for its saved conference. Unsynced confirmed appointments
+show **Set up Google Meet**, which attempts sync and opens the returned conference in the same tab.
+Cancelled appointments do not offer a join link, and missing links never open a random new conference.
+Lead rows show the corresponding meeting action only when a confirmed, non-ended booking matches
+both their normalized email address and card ID; the nearest such booking is used.
+
+
+The appointment row's colored Google Meet icon is grouped immediately to the right of **Cancel**,
+including on narrow screens. It opens the saved conference directly using the linked-account email
+as a hint; an unsynced confirmed appointment attempts to prepare its own conference first.
+**Sync all meetings** walks every eligible appointment with an owner-scoped cursor instead of stopping
+at ten records or excluding past meetings. Historical imports do not invite past guests or resend
+invitations. Cancelled events are removed rather than re-created. Progress and failures are visible;
+repeat syncs use the same event IDs. Google OAuth setup and user consent are required before any
+bookings can actually be uploaded to Google Calendar.

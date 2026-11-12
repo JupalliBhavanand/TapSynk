@@ -76,6 +76,12 @@ export interface Appointment {
   confirmation_email_status?: "not_requested" | "pending" | "sending" | "sent" | "failed";
   confirmation_email_sent_at?: string | null;
   booking_language?: string;
+  owner_id?: string;
+  google_event_id?: string | null;
+  google_event_version?: number;
+  google_meet_url?: string | null;
+  calendar_sync_status?: "pending" | "synced" | "failed" | "disconnected";
+  calendar_sync_error?: string | null;
 }
 
 export interface Subscription {
