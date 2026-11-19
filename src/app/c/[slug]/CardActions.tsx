@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Check, Handshake, Loader2, Share2, UserPlus, X } from "lucide-react";
+import { Bot, CalendarDays, Check, Handshake, Loader2, Share2, UserPlus, X } from "lucide-react";
+import { DirectBookingForm } from "@/components/DirectBookingForm";
 import { ChatPanel } from "@/components/ChatWidget";
 import { AI_BUTTON, AI_BUTTON_SUB } from "@/lib/greeting";
 import { loadGreeting, unlockAudio } from "@/lib/speech";
@@ -26,7 +27,7 @@ export function CardActions({
   logoUrl?: string;
   source: EventSource;
 }) {
-  const [open, setOpen] = useState<"chat" | "lead" | null>(null);
+  const [open, setOpen] = useState<"chat" | "lead" | "booking" | null>(null);
   const [contactHelp, setContactHelp] = useState(false);
   const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
   const contactUrl = `/api/vcard/${encodeURIComponent(slug)}.vcf?s=${source[0]}`;
@@ -97,6 +98,7 @@ export function CardActions({
           </span>
         </button>
       )}
+      {ai && booking && <button type="button" onClick={() => setOpen("booking")} className="btn btn-cream w-full py-3"><CalendarDays className="h-5 w-5" />Book an appointment</button>}
       <div className="grid grid-cols-2 gap-2.5">
         <button type="button" onClick={() => setOpen("lead")} className="btn btn-cream w-full">
           <Handshake className="h-4 w-4" /> Share my contact
@@ -113,8 +115,8 @@ export function CardActions({
               <ChatPanel slug={slug} businessName={businessName} ownerName={ownerName} intro={intro} booking={booking} logoUrl={logoUrl} source={source} onClose={() => setOpen(null)} className="h-full rounded-t-[28px] shadow-2xl sm:rounded-[28px]" />
             </div>
           ) : (
-            <div className="sheet-up w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Share your contact with ${first}`}>
-              <LeadForm slug={slug} first={first} source={source} onClose={() => setOpen(null)} />
+            <div className="sheet-up w-full max-w-md" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={open === "booking" ? "Book an appointment" : `Share your contact with ${first}`}>
+              {open === "booking" ? <DirectBookingForm slug={slug} source={source} onClose={() => setOpen(null)} /> : <LeadForm slug={slug} first={first} source={source} onClose={() => setOpen(null)} />}
             </div>
           )}
         </div>

@@ -62,7 +62,7 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <Field id="e-name" label="Full name" value={form.full_name} onChange={(v) => set("full_name", v)} required minLength={2} maxLength={80} />
             <Field id="e-title" label="Job title" value={form.job_title} onChange={(v) => set("job_title", v)} maxLength={80} placeholder="Sales Manager" />
-            <Field id="e-email" label="Work email" type="email" value={form.email} onChange={(v) => set("email", v)} maxLength={120} />
+            <Field id="e-email" label="Work email (employee login)" type="email" value={form.email} onChange={(v) => set("email", v)} maxLength={120} required />
             <Field id="e-phone" label="Phone" type="tel" value={form.phone} onChange={(v) => set("phone", v)} maxLength={40} />
             <div className="sm:col-span-2">
               <label className="label" htmlFor="e-slug">Card link</label>
@@ -87,6 +87,7 @@ export function EmployeeCardForm({ initial, company, userId, siteUrl }: { initia
               <textarea id="e-bio" value={form.bio} onChange={(e) => set("bio", e.target.value)} maxLength={400} rows={3} className="input resize-none" />
             </div>
           </div>
+          <p className="mt-4 text-sm text-muted">The employee can sign up or sign in with this work email and verify it to access their profile, leads and AI appointments. Share the login link with them: {siteUrl}/login. Changing this email transfers access to the new email.</p>
           <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm font-medium">
             <input type="checkbox" checked={form.published} onChange={(e) => set("published", e.target.checked)} className="h-4 w-4 accent-[var(--brand)]" />
             Card is live

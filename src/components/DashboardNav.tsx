@@ -18,11 +18,12 @@ const items = [
   { href: "/dashboard/company", label: "Company", icon: Building2 },
 ];
 
-export function DashboardNav({ aiLocked = false, admin = false, fulfillmentAdmin = false }: { aiLocked?: boolean; admin?: boolean; fulfillmentAdmin?: boolean }) {
+export function DashboardNav({ aiLocked = false, admin = false, fulfillmentAdmin = false, employee = false, employeeOnly = false }: { aiLocked?: boolean; admin?: boolean; fulfillmentAdmin?: boolean; employee?: boolean; employeeOnly?: boolean }) {
   const path = usePathname();
   const { counts } = useNotifications();
   const links = [
-    ...items,
+    ...(employeeOnly ? [] : items),
+    ...(employee ? [{ href: "/dashboard/employee", label: "My employee profiles", icon: IdCard }] : []),
     ...(fulfillmentAdmin ? [{ href: "/dashboard/fulfillment", label: "Fulfillment", icon: PackageCheck }] : []),
     ...(admin ? [{ href: "/dashboard/demos", label: "Demo requests", icon: Presentation }] : []),
   ];

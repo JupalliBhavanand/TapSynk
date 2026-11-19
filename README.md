@@ -50,6 +50,16 @@ Plans: **Virtual Card** $10/month · $25/3 months · $75/year, **AI Card** $25/m
 6. **Run**: `npm run dev` → http://localhost:3000. Test card: `4242 4242 4242 4242`.
 7. **Deploy**: push to GitHub, import in Vercel, add the same environment variables, set `NEXT_PUBLIC_SITE_URL` to your domain.
 
+## Google reviews and direct appointments
+
+In My card (or a company employee card editor), add the Google reviews link under social links. It opens Google directly and participates in per-link click analytics. Owner clicks remain excluded. Review links live in the existing `socials` JSON, so no new migration is needed.
+
+Published AI cards with booking enabled also show **Book an appointment**. Visitors choose a date and available time in the business timezone and enter their name and email. The direct form uses the existing working hours, one-hour notice, booking quotas and appointment records. Confirmations, owner notifications and configured Google Calendar/Meet delivery use the same pipeline as AI bookings. Appointments are visible in the existing dashboard. Existing booking/email migrations must already be applied. Run `npm run test:direct-booking` to check direct booking and review URL handling.
+
+## Per-link analytics
+
+Apply `supabase/migrations/0010_link_clicks.sql` to enable outbound-link click tracking. Owners can see Per-Link Clicks in Analytics, and company owners can see team links in Company Analytics. See [deployment and end-to-end testing](docs/link-click-tracking.md). Run `npm run test:link-clicks` for isolated PostgreSQL authorization and tracking tests.
+
 ## Security
 
 - Supabase row-level security on every table: users only ever read/write their own rows; billing rows are written only by the verified Stripe webhook.
@@ -73,6 +83,12 @@ Plans: **Virtual Card** $10/month · $25/3 months · $75/year, **AI Card** $25/m
 7. Order your own card with a real payment, refund it in Stripe, and check the order appears in `orders`.
 
 ## Fulfilment
+
+### Employee sign-in and private workspace
+
+Apply `supabase/migrations/0009_employee_access.sql` before deploying the employee workspace. Each employee card needs the employee's own work email. Employees create an account at `/signup`, verify that email, and sign in at `/login`. Existing verified accounts work immediately. Share the login link with the employee; adding a card does not send an invitation email or create a password.
+
+`/dashboard/employee` lets employees edit their name, title, phone and bio and view leads and AI appointments associated with their own card IDs. Database row-level security also restricts these reads. Company branding, card publishing, work email, billing and the shared AI remain owner-managed. Changing a card's work email immediately changes who can access it. Existing company cards with a matching verified work email also gain access. Use distinct individual emails rather than shared inboxes if access must remain private between employees. Run `node scripts/test-employee-access.mjs` for workspace authorization regression checks.
 
 Each paid checkout creates a row in `orders` with the shipping name and address. Update `fulfillment_status` (`processing` → `printing` → `shipped` → `delivered`) in the Supabase table editor and customers see it on their billing page. Program each NFC chip with the card URL `https://YOUR-DOMAIN/c/<slug>?s=t` (the `?s=t` marks the visit as a tap in analytics; the dashboard QR code uses `?s=q`). Company orders carry `company_id` and `quantity`, so ship that many cards.
 

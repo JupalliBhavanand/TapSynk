@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:link-clicks": "node scripts/test-link-clicks.mjs",
+    "test:direct-booking": "node scripts/test-direct-booking.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/test-ai-voice.mjs && node scripts/test-booking-confirmation.mjs && node scripts/test-smooth-voice.mjs && node scripts/test-streaming-audio.mjs && node scripts/test-voice-chat.mjs && node scripts/test-vcard.mjs && node scripts/test-payment-mail.mjs && node scripts/test-email-signature.mjs && node scripts/test-product-updates.mjs && node scripts/test-notifications.mjs && node scripts/test-google-links.mjs && node scripts/test-calendar-all.mjs && node scripts/test-meeting-delivery.mjs && node scripts/test-signature-export.mjs && node scripts/test-signature-portrait.mjs"
+    "test:employee-access": "node scripts/test-employee-access.mjs",
+    "test": "node scripts/test-ai-voice.mjs && node scripts/test-booking-confirmation.mjs && node scripts/test-smooth-voice.mjs && node scripts/test-streaming-audio.mjs && node scripts/test-voice-chat.mjs && node scripts/test-vcard.mjs && node scripts/test-payment-mail.mjs && node scripts/test-email-signature.mjs && node scripts/test-product-updates.mjs && node scripts/test-notifications.mjs && node scripts/test-google-links.mjs && node scripts/test-calendar-all.mjs && node scripts/test-meeting-delivery.mjs && node scripts/test-signature-export.mjs && node scripts/test-signature-portrait.mjs && node scripts/test-link-clicks.mjs && node scripts/test-direct-booking.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.27.0",
@@ -20,11 +23,12 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
+    "sharp": "0.35.5",
     "stripe": "^23.0.0",
-    "zod": "^4.6.5",
-    "sharp": "0.35.5"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",

@@ -21,7 +21,7 @@ function ContactRow({ href, icon, label, value }: { href?: string; icon: ReactNo
     </>
   );
   return href ? (
-    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-bg">
+    <a href={href} data-profile-link={label.toLowerCase()} target={href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-bg">
       {content}
     </a>
   ) : (
@@ -76,13 +76,13 @@ export function ProfileCard({ card, actions }: { card: CardView; actions?: React
 
         {socials.length > 0 && (
           <div className="mt-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Follow me</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{card.socials?.google_review ? "Links & reviews" : "Follow me"}</p>
             <ul className="mt-3 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
               {socials.map(({ key, href, label, bg }, i) => {
                 const Icon = SOCIAL_ICONS[key];
                 return (
                   <li key={key} className="fade-up" style={{ animationDelay: `${120 + i * 50}ms` }}>
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-1.5" aria-label={label}>
+                    <a href={href} data-profile-link={`social:${key}`} target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-1.5" aria-label={label}>
                       <span
                         className="grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_18px_-10px_rgba(13,17,32,0.6)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_14px_24px_-12px_rgba(13,17,32,0.7)]"
                         style={{ background: bg, color: key === "snapchat" ? "#111" : "#fff" }}

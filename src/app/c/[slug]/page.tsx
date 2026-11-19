@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { LogoMark } from "@/components/Logo";
 import { ProfileCard } from "@/components/ProfileCard";
+import { ProfileLinkTracker } from "@/components/ProfileLinkTracker";
+import { linkClickSource } from "@/lib/profile-links";
 import { getPublicCard } from "@/lib/data";
 import { introLine } from "@/lib/greeting";
 import { REQUIRE_SUBSCRIPTION, SITE_URL } from "@/lib/env";
@@ -38,7 +40,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicCardPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const source = parseSource((await searchParams).s);
+  const rawSource = (await searchParams).s;
+  const source = parseSource(rawSource);
   const found = await getPublicCard(slug);
   if (!found) notFound();
   const { card, subscription, agent } = found;
@@ -82,7 +85,9 @@ export default async function PublicCardPage({ params, searchParams }: Props) {
             </Link>
           </div>
         )}
-        <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} intro={introLine(agent?.description)} booking={agent?.booking_enabled ?? false} logoUrl={card.logo_url || undefined} source={source} />} />
+        <ProfileLinkTracker slug={card.slug} source={linkClickSource(rawSource)} enabled={live && !isOwner}>
+          <ProfileCard card={card} actions={<CardActions slug={card.slug} ai={aiEnabled} businessName={businessName} ownerName={card.full_name} intro={introLine(agent?.description)} booking={agent?.booking_enabled ?? false} logoUrl={card.logo_url || undefined} source={source} />} />
+        </ProfileLinkTracker>
         <Link href="/" className="mx-auto mt-6 flex w-fit items-center gap-2 text-xs font-medium text-muted hover:text-ink">
           <LogoMark className="h-5 w-5" /> Get your own AI business card
         </Link>

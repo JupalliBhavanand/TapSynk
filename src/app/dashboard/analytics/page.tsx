@@ -3,8 +3,11 @@ import { DailyViews, SourceSplit, StatTiles } from "@/components/Analytics";
 import { summarize, sinceIso } from "@/lib/analytics";
 import { requireDashboardData } from "@/lib/data";
 import type { CardEvent } from "@/lib/types";
+import { PerLinkAnalytics } from "@/components/PerLinkAnalytics";
+import { linkPeriod } from "@/lib/profile-links";
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ links?: string | string[] }> }) {
+  const period = linkPeriod((await searchParams).links);
   const { supabase, card } = await requireDashboardData();
   const { data } = card
     ? await supabase.from("card_events").select("kind, source, created_at").eq("card_id", card.id).gte("created_at", sinceIso()).limit(20000)
@@ -30,6 +33,7 @@ export default async function AnalyticsPage() {
           <p className="text-sm text-muted">
             All-time: {card.views.toLocaleString()} views · {card.saves.toLocaleString()} contacts saved · {card.ai_opens.toLocaleString()} AI chats.
           </p>
+          <PerLinkAnalytics supabase={supabase} cards={[card]} period={period} />
         </div>
       )}
     </div>

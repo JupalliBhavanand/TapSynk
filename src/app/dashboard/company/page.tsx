@@ -47,6 +47,7 @@ export default async function CompanyPage({ searchParams }: PageProps<"/dashboar
           <div>
             <h2 className="font-bold">Employee cards</h2>
             <p className="text-sm text-muted">{cards.length} of {company.seats} cards used · numbers are the last 30 days</p>
+            <p className="mt-2 text-sm text-muted">Employees sign up with their card’s work email and verify it to manage their profile and view only their own leads and AI appointments.</p>
           </div>
           {full ? (
             <Link href="/dashboard/company/billing" className="btn btn-dark text-sm"><Plus className="h-4 w-4" /> Add more seats</Link>
