@@ -78,7 +78,7 @@ const employeeSchema = z.object({
   full_name: z.string().trim().min(2, "Add the employee's name.").max(80),
   job_title: z.string().trim().max(80).default(""),
   bio: z.string().trim().max(400).default(""),
-  email: z.union([z.literal(""), z.string().trim().email("Enter a valid email.").max(120)]).default(""),
+  email: z.string().trim().toLowerCase().email("Enter the employee's work email so they can sign in.").max(120),
   phone: z
     .string()
     .trim()

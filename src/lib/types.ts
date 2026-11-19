@@ -1,6 +1,7 @@
 import type { BillingInterval, Tier } from "@/lib/plans";
 
 export type Socials = {
+  google_review?: string;
   linkedin?: string;
   instagram?: string;
   x?: string;

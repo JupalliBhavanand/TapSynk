@@ -3,9 +3,12 @@ import { DailyViews, SourceSplit, StatTiles } from "@/components/Analytics";
 import { emptyTotals, rate } from "@/lib/analytics";
 import { getCompanyTeam } from "@/lib/company";
 import { isActive } from "@/lib/types";
+import { PerLinkAnalytics } from "@/components/PerLinkAnalytics";
+import { linkPeriod } from "@/lib/profile-links";
 
-export default async function CompanyAnalyticsPage() {
-  const { company, cards, perCard, summary } = await getCompanyTeam();
+export default async function CompanyAnalyticsPage({ searchParams }: { searchParams: Promise<{ links?: string | string[] }> }) {
+  const period = linkPeriod((await searchParams).links);
+  const { supabase, company, cards, perCard, summary } = await getCompanyTeam();
   if (!company || !isActive(company)) redirect("/dashboard/company");
   const ranked = [...cards].sort((a, b) => (perCard[b.id]?.view ?? 0) - (perCard[a.id]?.view ?? 0));
   const maxViews = Math.max(1, ...ranked.map((c) => perCard[c.id]?.view ?? 0));
@@ -46,6 +49,7 @@ export default async function CompanyAnalyticsPage() {
           </ol>
         )}
       </section>
+      <PerLinkAnalytics supabase={supabase} cards={cards} period={period} team />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getEmployeeWorkspace } from "@/lib/employee";
 import QRCode from "qrcode";
 import { ArrowRight, CheckCircle2, Circle, Sparkles } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
@@ -15,6 +17,7 @@ import { hasAi, isActive, type Appointment } from "@/lib/types";
 
 export default async function DashboardHome() {
   const data = await requireDashboardData();
+  if (!data.card && !data.company && !data.subscription && (await getEmployeeWorkspace()).cards.length) redirect("/dashboard/employee");
   const { card, subscription, agent, supabase, trialAvailable } = data;
   const active = isActive(subscription);
   const link = card ? `${SITE_URL}/c/${card.slug}` : "";

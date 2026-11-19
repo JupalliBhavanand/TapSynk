@@ -30,6 +30,7 @@ export function SocialFields({ value, onChange, idPrefix = "social" }: { value: 
                 spellCheck={false}
                 className="input"
               />
+              {key === "google_review" && <p className="mt-1 text-xs text-muted">Paste your Google Business Profile review-request link.</p>}
             </div>
           </div>
         );

@@ -14,6 +14,7 @@ type Platform = {
 
 /** Every social platform a card can link to, in display order. */
 export const SOCIAL_PLATFORMS: Platform[] = [
+  { key: "google_review", label: "Google reviews", bg: "#ffffff", placeholder: "https://g.page/r/your-business/review" },
   { key: "linkedin", label: "LinkedIn", bg: "#0A66C2", placeholder: "linkedin.com/in/you", profile: (h) => `https://www.linkedin.com/in/${h}` },
   { key: "instagram", label: "Instagram", bg: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285AEB 90%)", placeholder: "@you", profile: (h) => `https://www.instagram.com/${h}` },
   { key: "whatsapp", label: "WhatsApp", bg: "#25D366", placeholder: "+1 555 123 4567" },
@@ -37,6 +38,14 @@ const HANDLE = /^@?([A-Za-z0-9._-]{1,60})$/;
 export function socialHref(key: SocialKey, raw: string | undefined): string {
   const value = (raw ?? "").trim();
   if (!value) return "";
+  if (key === "google_review") {
+    try {
+      const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      const host = url.hostname.toLowerCase();
+      return url.protocol === "https:" && !url.username && !url.password &&
+        (host === "g.page" || host === "maps.app.goo.gl" || host === "goo.gl" || host === "google.com" || host.endsWith(".google.com")) ? url.toString() : "";
+    } catch { return ""; }
+  }
   if (key === "whatsapp") {
     const digits = value.replace(/[^\d]/g, "");
     return digits.length >= 6 ? `https://wa.me/${digits}` : "";
